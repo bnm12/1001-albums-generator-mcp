@@ -1,0 +1,23 @@
+{
+  "dxt_version": "0.1",
+  "name": "1001-albums-generator-mcp-remote",
+  "display_name": "1001 Albums generator (Remote)",
+  "version": "1.0.0",
+  "description": "A MCP server for interacting with 1001 albums generator (Remote)",
+  "author": {
+    "name": "bnm12"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://1001-albums-mcp.bnm12.dk/mcp"
+      ]
+    }
+  },
+  "license": "ISC"
+}
