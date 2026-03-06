@@ -1,398 +1,116 @@
 <p align="center">
-
-<img src="assets/logo.svg" width="180" alt="1001 Albums MCP Logo"/>
-
+  <img src="assets/logo.svg" width="140" alt="1001 Albums MCP Logo"/>
 </p>
 
 <h1 align="center">1001 Albums Generator MCP</h1>
 
 <p align="center">
-AI-powered exploration of the <b>1001 Albums You Must Hear Before You Die</b> journey
+  <em>AI-powered exploration of your <strong>1001 Albums You Must Hear Before You Die</strong> journey</em>
 </p>
 
 <p align="center">
-
-![Node](https://img.shields.io/badge/node-18%2B-green)
-![MCP](https://img.shields.io/badge/MCP-compatible-blue)
-![License](https://img.shields.io/badge/license-ISC-lightgrey)
-![Claude](https://img.shields.io/badge/Claude-Desktop-purple)
-![API](https://img.shields.io/badge/API-1001AlbumGenerator-orange)
-
+  <img src="https://img.shields.io/badge/node-18%2B-brightgreen?style=flat-square"/>
+  <img src="https://img.shields.io/badge/MCP-compatible-4A90D9?style=flat-square"/>
+  <img src="https://img.shields.io/badge/Claude-Desktop-8B5CF6?style=flat-square"/>
+  <img src="https://img.shields.io/badge/license-ISC-lightgrey?style=flat-square"/>
 </p>
-
----
-
-# 🎧 What This Project Does
-
-**1001 Albums Generator MCP** is a **Model Context Protocol server** that lets AI assistants interact with your **1001 Albums Generator listening history**.
-
-Instead of manually browsing the website, your AI can:
-
-🎵 Retrieve today's album
-📚 Explore your listening history
-🔍 Search artists, years, or genres
-📊 Analyze ratings and progress
-🌍 Compare your taste with the global community
-🧠 Discover musical relationships between albums
-
-It turns your **1001 albums challenge into an AI-powered music exploration tool.**
-
----
-
-# ✨ Features
-
-### 🎵 Personal Listening Insights
-
-- Today's album
-- Listening history
-- Search by artist/year/genre
-- Progress tracking
-
-### 📊 Data & Analytics
-
-- Rating averages
-- Listening streaks
-- Completion stats
-- Album relationships
-
-### 🌍 Community Data
-
-- Global ratings
-- Popular albums
-- Controversial albums
-- Community submitted albums
-
-### ⚡ Smart API Handling
-
-- **20 second throttling**
-- **4 hour caching**
-- API-safe request handling
-
----
-
-# 🎬 Demo
 
 <p align="center">
-<img src="assets/demo.gif" width="850"/>
+  <a href="#-installation">Install</a> ·
+  <a href="#-mcp-tools-reference">Tools</a> ·
+  <a href="#-example-prompts">Prompts</a> ·
+  <a href="#-contributing">Contributing</a>
 </p>
 
-Example interaction with an AI assistant connected to the MCP server.
+---
+
+<p align="center">
+  <img src="assets/demo.gif" width="850" alt="Demo"/>
+</p>
+
+---
+
+## What is this?
+
+**1001 Albums Generator MCP** connects AI assistants to your [1001 Albums Generator](https://1001albumsgenerator.com) listening history via the [Model Context Protocol](https://modelcontextprotocol.io).
+
+Instead of manually browsing the website, your AI can retrieve today's album, explore your history, analyze your taste, compare you to the global community, and discover musical relationships — all in natural conversation.
 
 ```
-User:
-What's today's album from my 1001 albums project?
-
-Claude:
-Today's album is:
-
-Miles Davis — Kind of Blue (1959)
-
-This is one of the most influential jazz albums ever recorded.
-It features John Coltrane, Cannonball Adderley, and Bill Evans.
-
-Community rating: ★ 4.63 / 5
+You:    What's today's album?
+Claude: Today's album is Miles Davis — Kind of Blue (1959).
+        One of the most influential jazz recordings ever made,
+        featuring Coltrane, Cannonball Adderley, and Bill Evans.
+        Community rating: ★ 4.63 / 5
 ```
 
 ---
 
-# 📈 Example Insights
+## ✨ Capabilities
 
-With MCP connected, AI can generate insights like:
-
-### Taste Profile
-
-```
-Your most common genres:
-
-1. Rock
-2. Jazz
-3. Art Rock
-4. Folk
-5. Psychedelic Rock
-```
+| Area                   | What the AI can do                                     |
+| ---------------------- | ------------------------------------------------------ |
+| 🎵 **Daily listening** | Retrieve today's album, get background & context       |
+| 📚 **History**         | Browse, filter, and search your full listening history |
+| 📊 **Analytics**       | Ratings, streaks, decade distributions, taste profiles |
+| 🌍 **Community**       | Compare your ratings to global averages                |
+| 🧠 **Discovery**       | Musical lineage, artist clusters, genre connections    |
 
 ---
 
-### Decade Distribution
+## 🚀 Installation
 
-```
-1960s  ████████████
-1970s  ███████████████████
-1980s  ███████
-1990s  █████
-2000s  ███
-```
+### Option A — Claude Desktop Extension _(recommended)_
 
----
+The easiest way. No Node.js required for the remote version.
 
-### Rating Bias vs Community
+1. Go to the [releases page](https://github.com/bnm12/1001-albums-generator-mcp/releases)
+2. Download the right `.dxt` file:
 
-```
-Albums you rated higher than average:
-
-• London Calling
-• Blue Train
-• The Velvet Underground & Nico
-```
-
----
-
-### Artist Clusters
-
-```
-David Bowie
-   ├─ Lou Reed
-   ├─ Iggy Pop
-   └─ Brian Eno
-```
-
----
-
-# 🔬 Possible AI Analyses
-
-AI assistants can analyze your project in ways the website can't:
-
-### Taste fingerprint
-
-```
-Your taste leans toward:
-
-• Experimental rock
-• Jazz fusion
-• Concept albums
-```
-
----
-
-### Hidden patterns
-
-```
-You consistently rate albums from 1971 above average.
-```
-
----
-
-### Musical lineage
-
-```
-The album you listened to today connects to:
-
-Miles Davis
-  → Herbie Hancock
-  → Weather Report
-  → Jaco Pastorius
-```
-
----
-
-# 📊 Architecture
-
-```
-                ┌───────────────────────────────┐
-                │        AI Assistant            │
-                │  (Claude / MCP Clients)       │
-                └───────────────┬───────────────┘
-                                │
-                                │ MCP Tools
-                                ▼
-                ┌───────────────────────────────┐
-                │      1001 Albums MCP Server   │
-                │                               │
-                │  • Tool Handlers              │
-                │  • Cache Layer                │
-                │  • Rate Limiter               │
-                │  • API Client                 │
-                └───────────────┬───────────────┘
-                                │
-                                ▼
-                ┌───────────────────────────────┐
-                │ 1001 Albums Generator API     │
-                │ https://1001albumsgenerator.com │
-                └───────────────────────────────┘
-```
-
----
-
-# 🛠 MCP Tools
-
-## 💿 Album Tools
-
-### `get_album_of_the_day`
-
-Returns today's assigned album.
-
-Useful for:
-
-- daily listening prompts
-- AI reviews
-- album analysis
-
----
-
-### `get_album_detail`
-
-Fetch detailed metadata:
-
-- artist
-- year
-- genre
-- streaming links
-- community ratings
-- reviews
-
----
-
-## 📚 History Tools
-
-### `list_project_history`
-
-Retrieve your entire listening history.
-
-Data returned:
-
-- album
-- artist
-- rating
-- date listened
-- notes
-
----
-
-### `search_project_history`
-
-Search history by:
-
-- artist
-- album
-- year
-- genre
-
-Example searches:
-
-```
-albums from 1977
-jazz albums
-David Bowie
-```
-
----
-
-## 📊 Statistics
-
-### `get_project_stats`
-
-Provides:
-
-- albums completed
-- total progress
-- average rating
-- listening streak
-
----
-
-### `get_album_context`
-
-Discovers relationships between albums:
-
-Examples:
-
-- shared genres
-- same producer
-- related artists
-- historical music movements
-
----
-
-## 🌍 Community Data Tools
-
-### `list_book_album_stats`
-
-Community statistics for albums in the original **1001 Albums book**.
-
-Includes:
-
-- average rating
-- popularity
-- rating distribution
-
----
-
-### `list_user_submitted_album_stats`
-
-Statistics for albums submitted by the community.
-
----
-
-### `get_book_album_stat`
-
-Detailed stats for a specific canonical album.
-
----
-
-# 💬 Example AI Prompts
-
-## See [prompts.md](./prompts.md)
-
-# 🚀 Installation
-
-## Option 1 — Claude Desktop Extension (Recommended)
-
-1. Visit the releases page:
-
-https://github.com/bnm12/1001-albums-generator-mcp/releases
-
-2. Download:
-
-| File           | Description                   |
-| -------------- | ----------------------------- |
-| `*-remote.dxt` | Connects to hosted MCP server |
-| `*.dxt`        | Runs locally                  |
+| File           | Description                                      |
+| -------------- | ------------------------------------------------ |
+| `*-remote.dxt` | Connects to the hosted server — zero local setup |
+| `*.dxt`        | Runs the MCP server locally on your machine      |
 
 3. Open **Claude Desktop → Settings → Extensions**
-
-4. Drag the `.dxt` file into the window.
+4. Drag and drop the `.dxt` file into the window
 
 ---
 
-# Option 2 — Local Installation
+### Option B — Remote HTTP Server _(no install)_
 
-## Requirements
+Point any MCP client directly at the hosted server:
 
-- Node.js 18+
-- npm
+```
+https://1001-albums-mcp.bnm12.dk/mcp
+```
 
-### Clone
+**Claude Desktop (`claude_desktop_config.json`):**
+
+```json
+{
+  "mcpServers": {
+    "1001-albums": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://1001-albums-mcp.bnm12.dk/mcp"]
+    }
+  }
+}
+```
+
+---
+
+### Option C — Local Installation
+
+**Requirements:** Node.js 18+
 
 ```bash
 git clone https://github.com/bnm12/1001-albums-generator-mcp.git
 cd 1001-albums-generator-mcp
+npm install && npm run build
 ```
 
-### Install
-
-```bash
-npm install
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-### Run
-
-```bash
-node dist/index.js
-```
-
----
-
-# 🔌 Claude Desktop Configuration
-
-Add to:
-
-`claude_desktop_config.json`
+**Claude Desktop (`claude_desktop_config.json`):**
 
 ```json
 {
@@ -400,62 +118,141 @@ Add to:
     "1001-albums": {
       "command": "node",
       "args": ["/absolute/path/to/dist/index.js"],
-      "env": {
-        "MCP_MODE": "stdio"
-      }
+      "env": { "MCP_MODE": "stdio" }
     }
   }
 }
 ```
 
-Restart Claude Desktop.
+**Run as an HTTP server** (for use with any MCP client over HTTP):
 
----
-
-# 🤝 Contributing
-
-Contributions are welcome.
-
-Ideas:
-
-- new MCP tools
-- deeper album analysis
-- recommendation engine
-- genre clustering
-- visual listening stats
-
-Workflow:
-
-```
-fork
-branch
-commit
-pull request
+```bash
+MCP_MODE=sse PORT=3000 node dist/index.js
+# MCP endpoint: http://localhost:3000/mcp
 ```
 
----
-
-# 📜 License
-
-ISC License
+Restart Claude Desktop after any config change.
 
 ---
 
-# ❤️ Credits
+## 🛠 MCP Tools Reference
 
-1001 Albums Generator
-https://1001albumsgenerator.com
+### Project Tools
 
-Model Context Protocol
-https://modelcontextprotocol.io
+| Tool                     | Description                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `get_album_of_the_day`   | Today's assigned album with full metadata and project notes                  |
+| `get_project_stats`      | Progress summary: albums generated, rated, unrated, current streak           |
+| `list_project_history`   | Full listening history in slim format (name, artist, year, genres, ratings)  |
+| `search_project_history` | Search history by artist, album, year, or genre                              |
+| `get_album_detail`       | Complete detail for one album: review, streaming links, Wikipedia, subgenres |
+| `get_album_context`      | Relationships: same artist, same year, influences, styles, collaborators     |
+
+### Community Tools
+
+| Tool                              | Description                                               |
+| --------------------------------- | --------------------------------------------------------- |
+| `list_book_album_stats`           | Community ratings for all ~1001 canonical book albums     |
+| `get_book_album_stat`             | Look up a specific book album's community stats           |
+| `list_user_submitted_album_stats` | Stats for albums submitted by users outside the book list |
+
+### Utility
+
+| Tool           | Description                                                       |
+| -------------- | ----------------------------------------------------------------- |
+| `refresh_data` | Force-refresh cached data (`global`, `user`, `project`, or `all`) |
+
+> **Note on detail vs. list tools:** List and search tools return a slim format — no reviews, streaming IDs, or images — to keep responses concise. Call `get_album_detail` when you need a written review, a Spotify/Apple Music link, or full genre breakdown.
 
 ---
 
-# 🎧 Built for Music Nerds
+## 💬 Example Prompts
 
-If you're doing the **1001 Albums challenge**, this server lets AI become your:
+**Daily**
 
-🎼 music historian
-🧠 critic
-🎧 curator
-🔎 discovery engine
+```
+What's today's album from my project?
+Write a Pitchfork-style review of today's album.
+```
+
+**History & taste**
+
+```
+Which decade dominates my listening history?
+Which albums did I rate way above the community average?
+What genres appear most often in my history?
+```
+
+**Discovery**
+
+```
+Find connections between the last five albums I listened to.
+Explain the musical lineage from my most recent jazz album.
+Are there recurring producers or collaborators in my history?
+```
+
+**Fun**
+
+```
+If my listening history were a festival lineup, what would it look like?
+Create a listener archetype based on my ratings.
+```
+
+See [prompts.md](./prompts.md) for the full prompt pack.
+
+---
+
+## 🏗 Architecture
+
+```
+┌─────────────────────────┐
+│     AI Assistant        │  Claude / any MCP client
+└────────────┬────────────┘
+             │ MCP (stdio or HTTP)
+             ▼
+┌─────────────────────────┐
+│  1001 Albums MCP Server │
+│  · Tool handlers        │
+│  · 4-hour cache         │
+│  · 20s rate limiter     │
+└────────────┬────────────┘
+             │ HTTPS
+             ▼
+┌─────────────────────────┐
+│  1001albumsgenerator.com│
+│  API v1                 │
+└─────────────────────────┘
+```
+
+The server enforces a **20-second minimum interval** between API requests and caches responses for **4 hours** to stay well within the upstream rate limit of 3 requests/minute.
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome. Some ideas:
+
+- New MCP tools (recommendation engine, genre clustering)
+- Deeper album analysis (mood inference, BPM/key data)
+- Visual listening stats
+
+```bash
+# Standard workflow
+git fork → branch → commit → pull request
+```
+
+When adding tools, register them inside `createMcpServer()` in `src/index.ts` and update this README.
+
+---
+
+## 📜 License
+
+[ISC](./LICENSE) © 2025 bnm12
+
+---
+
+<p align="center">
+  Built for music nerds doing the <a href="https://1001albumsgenerator.com">1001 Albums challenge</a>
+  <br/>
+  Powered by <a href="https://modelcontextprotocol.io">Model Context Protocol</a>
+</p>
