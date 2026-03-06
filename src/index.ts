@@ -76,6 +76,101 @@ function createMcpServer() {
   );
 
   registerTool(
+    'get_group',
+    'Returns a summary of a 1001 Albums Generator group, including the group name, member list, current album, all-time highest rated album, and all-time lowest rated album. Does not include the latest album votes — use get_group_latest_album for that. The groupSlug is the group name in lowercase with hyphens instead of spaces (find it in the group page URL). Data is cached for 4 hours.',
+    {
+      groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
+    },
+    async ({ groupSlug }) => {
+      const group = await client.getGroup(groupSlug);
+      // Strip latestAlbumWithVotes — that belongs to get_group_latest_album
+      const { latestAlbumWithVotes, ...summary } = group;
+      return {
+        content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+      };
+    },
+    true
+  );
+
+  registerTool(
+    'get_group_latest_album',
+    'Returns the latest album assigned to a group along with all member votes (ratings) for that album. Use this to see how group members rated their most recent shared album. The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.',
+    {
+      groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
+    },
+    async ({ groupSlug }) => {
+      const group = await client.getGroup(groupSlug);
+
+      if (group.latestAlbumWithVotes) {
+        const reviews = await client.getGroupAlbumReviews(groupSlug, group.latestAlbumWithVotes.album.uuid);
+        group.latestAlbumWithVotes.votes = reviews.reviews.map(r => ({
+          projectIdentifier: r.projectIdentifier,
+          rating: r.rating
+        }));
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(group.latestAlbumWithVotes ?? null, null, 2),
+          },
+        ],
+      };
+    },
+    true
+  );
+
+  registerTool(
+    'get_group_album_reviews',
+    'Returns all member reviews and ratings for a specific album within a group. Accepts either the album UUID or album name as the albumIdentifier — if a name is given, it is resolved to a UUID via the global book stats. For best results, prefer passing the UUID directly (available from get_group or get_group_latest_album). The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.',
+    {
+      groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
+      albumIdentifier: z.string().describe('The album UUID, or album name to resolve against the book list'),
+    },
+    async ({ groupSlug, albumIdentifier }) => {
+      // Determine if albumIdentifier looks like a UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let albumUuid = albumIdentifier;
+
+      if (!uuidRegex.test(albumIdentifier)) {
+        // Attempt name resolution via global book stats
+        // Best-effort: search the group's highscore, lowscore, currentAlbum, and latestAlbumWithVotes
+        const group = await client.getGroup(groupSlug);
+        const candidates = [
+          group.currentAlbum,
+          group.allTimeHighscore?.album,
+          group.allTimeLowscore?.album,
+          group.latestAlbumWithVotes?.album,
+        ].filter((a): a is NonNullable<typeof a> => a != null);
+
+        const lowerIdentifier = albumIdentifier.toLowerCase();
+        const match = candidates.find(
+          (a) => a.name.toLowerCase() === lowerIdentifier
+        );
+
+        if (!match) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Could not resolve album name "${albumIdentifier}" to a UUID. Try passing the UUID directly instead.`,
+              },
+            ],
+          };
+        }
+        albumUuid = match.uuid;
+      }
+
+      const reviews = await client.getGroupAlbumReviews(groupSlug, albumUuid);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(reviews, null, 2) }],
+      };
+    },
+    true
+  );
+
+  registerTool(
     'get_book_album_stat',
     'Search the canonical book list by album name or artist. Returns matching entries with community voting stats (votes, average rating, controversial score, vote breakdown). Only searches the ~1001 albums from the original book — for user-submitted albums outside the book list, use list_user_submitted_album_stats. Data is cached for 4 hours.',
     {
@@ -401,12 +496,13 @@ function createMcpServer() {
 
   registerTool(
     'refresh_data',
-    'Force a refresh of cached data from the API.',
+    'Force a refresh of cached data from the API. Use type "group" with a groupSlug to refresh a specific group\'s cached data.',
     {
-      type: z.enum(['global', 'user', 'project', 'all']).describe('Type of data to refresh'),
+      type: z.enum(['global', 'user', 'project', 'group', 'all']).describe('Type of data to refresh'),
       projectIdentifier: z.string().optional().describe('Required if type is "project"'),
+      groupSlug: z.string().optional().describe('Required if type is "group"'),
     },
-    async ({ type, projectIdentifier }) => {
+    async ({ type, projectIdentifier, groupSlug }) => {
       // "global" clears the book list cache (/albums/stats)
       // "user" clears the user-submitted albums cache (/user-albums/stats)
       // "project" clears a specific project cache (/projects/:id)
@@ -419,6 +515,11 @@ function createMcpServer() {
           throw new Error('projectIdentifier is required when type is "project"');
         }
         await client.getProject(projectIdentifier, true);
+      } else if (type === 'group') {
+        if (!groupSlug) {
+          throw new Error('groupSlug is required when type is "group"');
+        }
+        await client.getGroup(groupSlug, true);
       } else if (type === 'all') {
         client.clearCache();
       }

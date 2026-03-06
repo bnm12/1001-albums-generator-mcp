@@ -59,6 +59,37 @@ export interface ProjectInfo {
   currentAlbumNotes: string;
 }
 
+export interface GroupMember {
+  name: string;
+  projectIdentifier: string;
+}
+
+export interface GroupAlbumWithVotes {
+  album: Album;
+  votes: { projectIdentifier: string; rating: number | null }[];
+}
+
+export interface GroupInfo {
+  name: string;
+  slug: string;
+  members: GroupMember[];
+  currentAlbum: Album | null;
+  allTimeHighscore: GroupAlbumWithVotes | null;
+  allTimeLowscore: GroupAlbumWithVotes | null;
+  latestAlbumWithVotes: GroupAlbumWithVotes | null;
+}
+
+export interface GroupAlbumReview {
+  projectIdentifier: string;
+  rating: number | null;
+  review: string;
+}
+
+export interface GroupAlbumReviews {
+  album: Album;
+  reviews: GroupAlbumReview[];
+}
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -73,6 +104,8 @@ export class AlbumsGeneratorClient {
   private globalStatsCache: CacheEntry<GlobalStats> | null = null;
   private userStatsCache: CacheEntry<UserAlbumStats> | null = null;
   private projectsCache: Map<string, CacheEntry<ProjectInfo>> = new Map();
+  private groupsCache: Map<string, CacheEntry<GroupInfo>> = new Map();
+  private groupAlbumReviewsCache: Map<string, CacheEntry<GroupAlbumReviews>> = new Map();
 
   constructor(baseURL: string = 'https://1001albumsgenerator.com/api/v1') {
     this.axiosInstance = axios.create({
@@ -135,9 +168,96 @@ export class AlbumsGeneratorClient {
     return response.data;
   }
 
+  async getGroup(groupSlug: string, forceRefresh = false): Promise<GroupInfo> {
+    const cached = this.groupsCache.get(groupSlug);
+    if (!forceRefresh && this.isCacheValid(cached)) {
+      return cached.data;
+    }
+    await this.throttle();
+    const response = await this.axiosInstance.get(`/groups/${groupSlug}`);
+    const data = response.data;
+
+    // Map API fields to GroupInfo
+    const groupInfo: GroupInfo = {
+      name: data.name,
+      slug: data.slug,
+      members: (data.members || []).map((m: any) => ({
+        name: m.name,
+        projectIdentifier: m.name, // The API doesn't seem to provide a separate identifier, use name
+      })),
+      currentAlbum: data.currentAlbum || null,
+      allTimeHighscore: data.highestRatedAlbums?.[0]
+        ? {
+            album: data.highestRatedAlbums[0],
+            votes: [], // Group endpoint doesn't return member-specific votes for high/low scores
+          }
+        : null,
+      allTimeLowscore: data.lowestRatedAlbums?.[0]
+        ? {
+            album: data.lowestRatedAlbums[0],
+            votes: [],
+          }
+        : null,
+      latestAlbumWithVotes: data.latestAlbum
+        ? {
+            album: data.latestAlbum,
+            votes: [], // To be populated if needed, or left empty if not provided by this endpoint
+          }
+        : null,
+    };
+
+    this.groupsCache.set(groupSlug, {
+      data: groupInfo,
+      timestamp: Date.now(),
+    });
+    return groupInfo;
+  }
+
+  async getGroupAlbumReviews(
+    groupSlug: string,
+    albumUuid: string,
+    forceRefresh = false
+  ): Promise<GroupAlbumReviews> {
+    const cacheKey = `${groupSlug}:${albumUuid}`;
+    const cached = this.groupAlbumReviewsCache.get(cacheKey);
+    if (!forceRefresh && this.isCacheValid(cached)) {
+      return cached.data;
+    }
+    await this.throttle();
+    const response = await this.axiosInstance.get(`/groups/${groupSlug}/albums/${albumUuid}`);
+    const data = response.data;
+
+    const albumReviews: GroupAlbumReviews = {
+      album: {
+        uuid: albumUuid,
+        name: data.albumName,
+        artist: data.albumArtist,
+        // The endpoint doesn't return full metadata, so we fill what we have
+        slug: '',
+        images: [],
+        releaseDate: '',
+        genres: [],
+        wikipediaUrl: '',
+      },
+      reviews: (data.reviews || []).map((r: any) => ({
+        projectIdentifier: r.projectName,
+        rating: r.rating,
+        review: r.review,
+      })),
+    };
+
+    this.groupAlbumReviewsCache.set(cacheKey, {
+      data: albumReviews,
+      timestamp: Date.now(),
+    });
+    return albumReviews;
+  }
+
   clearCache() {
     this.globalStatsCache = null;
     this.userStatsCache = null;
     this.projectsCache.clear();
+    this.groupsCache.clear();
+    this.groupAlbumReviewsCache.clear();
   }
 }
