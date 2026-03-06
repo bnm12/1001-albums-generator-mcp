@@ -339,38 +339,40 @@ async function main() {
 
     const transports = new Map<string, StreamableHTTPServerTransport>();
 
-    app.all('/mcp', async (req, res) => {
-      const sessionId = (req.query.sessionId ||
-        req.headers['mcp-session-id'] ||
-        req.headers['x-session-id']) as string | undefined;
+    app.all('/mcp', async (req, res, next) => {
+      try {
+        const sessionId = (req.query.sessionId ||
+          req.headers['mcp-session-id'] ||
+          req.headers['x-session-id']) as string | undefined;
 
-      if (sessionId) {
-        const transport = transports.get(sessionId);
-        if (transport) {
-          await transport.handleRequest(req, res);
-        } else {
-          res.status(400).send('Session not found');
-        }
-      } else {
-        const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-        });
-
-        const id = transport.sessionId;
-        if (id) {
-          transports.set(id, transport);
-        }
-
-        transport.onclose = () => {
-          const sid = transport.sessionId;
-          if (sid) {
-            transports.delete(sid);
+        if (sessionId) {
+          const transport = transports.get(sessionId);
+          if (transport) {
+            await transport.handleRequest(req, res);
+          } else {
+            res.status(400).send('Session not found');
           }
-        };
+        } else {
+          const transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => randomUUID(),
+          });
 
-        const server = createMcpServer();
-        await server.connect(transport);
-        await transport.handleRequest(req, res);
+          transport.onclose = () => {
+            if (transport.sessionId) {
+              transports.delete(transport.sessionId);
+            }
+          };
+
+          const server = createMcpServer();
+          await server.connect(transport);
+          await transport.handleRequest(req, res);
+
+          if (transport.sessionId) {
+            transports.set(transport.sessionId, transport);
+          }
+        }
+      } catch (err) {
+        next(err);
       }
     });
 
