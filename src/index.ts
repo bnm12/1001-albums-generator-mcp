@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { AlbumsGeneratorClient } from './api.js';
+import { randomUUID } from 'node:crypto';
 import express from 'express';
 
 const server = new McpServer({
@@ -332,33 +333,45 @@ async function main() {
     const app = express();
     const port = process.env.PORT || 3000;
 
-    const transports = new Map<string, SSEServerTransport>();
+    const transports = new Map<string, StreamableHTTPServerTransport>();
 
-    app.get('/sse', async (req, res) => {
-      const transport = new SSEServerTransport('/message', res);
-      transports.set(transport.sessionId, transport);
+    app.all('/mcp', async (req, res) => {
+      const sessionId = (req.query.sessionId ||
+        req.headers['mcp-session-id'] ||
+        req.headers['x-session-id']) as string | undefined;
 
-      transport.onclose = () => {
-        transports.delete(transport.sessionId);
-      };
-
-      await server.connect(transport);
-    });
-
-    app.post('/message', async (req, res) => {
-      const sessionId = req.query.sessionId as string;
-      const transport = transports.get(sessionId);
-
-      if (transport) {
-        await transport.handlePostMessage(req, res);
+      if (sessionId) {
+        const transport = transports.get(sessionId);
+        if (transport) {
+          await transport.handleRequest(req, res);
+        } else {
+          res.status(400).send('Session not found');
+        }
       } else {
-        res.status(400).send('Session not found');
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+        });
+
+        const id = transport.sessionId;
+        if (id) {
+          transports.set(id, transport);
+        }
+
+        transport.onclose = () => {
+          const sid = transport.sessionId;
+          if (sid) {
+            transports.delete(sid);
+          }
+        };
+
+        await server.connect(transport);
+        await transport.handleRequest(req, res);
       }
     });
 
     app.listen(port, () => {
       console.error(
-        `1001 Albums Generator MCP Server running on SSE at http://localhost:${port}/sse`
+        `1001 Albums Generator MCP Server running on Streamable HTTP at http://localhost:${port}/mcp`
       );
     });
   } else {
