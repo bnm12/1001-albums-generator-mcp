@@ -1,7 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
 import { AlbumsGeneratorClient } from './api.js';
+import express from 'express';
 
 const server = new McpServer({
   name: '1001-albums-generator',
@@ -141,7 +143,6 @@ server.tool(
       await client.getProject(projectIdentifier, true);
     } else if (type === 'all') {
       client.clearCache();
-      // We don't eagerly refetch everything here to avoid hitting rate limits too hard at once
     }
 
     return {
@@ -151,9 +152,35 @@ server.tool(
 );
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('1001 Albums Generator MCP Server running on stdio');
+  const mode = process.env.MCP_MODE || 'stdio';
+
+  if (mode === 'sse') {
+    const app = express();
+    const port = process.env.PORT || 3000;
+
+    let transport: SSEServerTransport | null = null;
+
+    app.get('/sse', async (req, res) => {
+      transport = new SSEServerTransport('/message', res);
+      await server.connect(transport);
+    });
+
+    app.post('/message', async (req, res) => {
+      if (transport) {
+        await transport.handlePostMessage(req, res);
+      } else {
+        res.status(400).send('No active SSE session');
+      }
+    });
+
+    app.listen(port, () => {
+      console.error(`1001 Albums Generator MCP Server running on SSE at http://localhost:${port}/sse`);
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('1001 Albums Generator MCP Server running on stdio');
+  }
 }
 
 main().catch((error) => {

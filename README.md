@@ -39,6 +39,14 @@ This server is designed to be used with an MCP client (like Claude Desktop).
 node dist/index.js
 ```
 
+### Running on SSE (HTTP)
+
+```bash
+MCP_MODE=sse PORT=3000 node dist/index.js
+```
+
+The server will be available at `http://localhost:3000/sse`.
+
 ### Tools
 
 - `get_global_stats`: Get all global album stats.
