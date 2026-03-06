@@ -43,10 +43,20 @@ export interface ProjectInfo {
   currentAlbumNotes: string;
 }
 
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
 export class AlbumsGeneratorClient {
   private axiosInstance: AxiosInstance;
   private lastRequestTime: number = 0;
   private readonly MIN_REQUEST_INTERVAL = 20000; // 3 requests per minute = 1 request every 20 seconds
+  private readonly CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+  private globalStatsCache: CacheEntry<GlobalStats> | null = null;
+  private userStatsCache: CacheEntry<UserAlbumStats> | null = null;
+  private projectsCache: Map<string, CacheEntry<ProjectInfo>> = new Map();
 
   constructor(baseURL: string = 'https://1001albumsgenerator.com/api/v1') {
     this.axiosInstance = axios.create({
@@ -64,21 +74,54 @@ export class AlbumsGeneratorClient {
     this.lastRequestTime = Date.now();
   }
 
-  async getGlobalStats(): Promise<GlobalStats> {
+  private isCacheValid<T>(entry: CacheEntry<T> | null | undefined): entry is CacheEntry<T> {
+    if (!entry) return false;
+    return Date.now() - entry.timestamp < this.CACHE_TTL;
+  }
+
+  async getGlobalStats(forceRefresh = false): Promise<GlobalStats> {
+    if (!forceRefresh && this.isCacheValid(this.globalStatsCache)) {
+      return this.globalStatsCache.data;
+    }
     await this.throttle();
     const response = await this.axiosInstance.get('/albums/stats');
+    this.globalStatsCache = {
+      data: response.data,
+      timestamp: Date.now(),
+    };
     return response.data;
   }
 
-  async getUserAlbumStats(): Promise<UserAlbumStats> {
+  async getUserAlbumStats(forceRefresh = false): Promise<UserAlbumStats> {
+    if (!forceRefresh && this.isCacheValid(this.userStatsCache)) {
+      return this.userStatsCache.data;
+    }
     await this.throttle();
     const response = await this.axiosInstance.get('/user-albums/stats');
+    this.userStatsCache = {
+      data: response.data,
+      timestamp: Date.now(),
+    };
     return response.data;
   }
 
-  async getProject(projectIdentifier: string): Promise<ProjectInfo> {
+  async getProject(projectIdentifier: string, forceRefresh = false): Promise<ProjectInfo> {
+    const cached = this.projectsCache.get(projectIdentifier);
+    if (!forceRefresh && this.isCacheValid(cached)) {
+      return cached.data;
+    }
     await this.throttle();
     const response = await this.axiosInstance.get(`/projects/${projectIdentifier}`);
+    this.projectsCache.set(projectIdentifier, {
+      data: response.data,
+      timestamp: Date.now(),
+    });
     return response.data;
+  }
+
+  clearCache() {
+    this.globalStatsCache = null;
+    this.userStatsCache = null;
+    this.projectsCache.clear();
   }
 }

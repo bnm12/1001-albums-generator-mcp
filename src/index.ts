@@ -12,7 +12,7 @@ const client = new AlbumsGeneratorClient();
 
 server.tool(
   'get_global_stats',
-  'Get all global album stats including votes, average rating, genres, and controversial score.',
+  'Get all global album stats including votes, average rating, genres, and controversial score. Data is cached for 4 hours.',
   {},
   async () => {
     const stats = await client.getGlobalStats();
@@ -24,7 +24,7 @@ server.tool(
 
 server.tool(
   'get_global_album_stat',
-  'Get statistics for a specific album from global stats by name or artist.',
+  'Get statistics for a specific album from global stats by name or artist. Data is cached for 4 hours.',
   {
     query: z.string().describe('Search query for album name or artist'),
   },
@@ -44,7 +44,7 @@ server.tool(
 
 server.tool(
   'get_project_info',
-  'Get general project information including history and current album.',
+  'Get general project information including history and current album. Data is cached for 4 hours.',
   {
     projectIdentifier: z.string().describe('The name of the project or the sharerId'),
   },
@@ -74,7 +74,7 @@ server.tool(
 
 server.tool(
   'get_user_history',
-  "Read the user's entire album history.",
+  "Read the user's entire album history. Data is cached for 4 hours.",
   {
     projectIdentifier: z.string().describe('The name of the project or the sharerId'),
   },
@@ -88,7 +88,7 @@ server.tool(
 
 server.tool(
   'get_user_stats',
-  'Get user album stats (votes, average score, genres, etc.).',
+  'Get user album stats (votes, average score, genres, etc.). Data is cached for 4 hours.',
   {},
   async () => {
     const stats = await client.getUserAlbumStats();
@@ -100,7 +100,7 @@ server.tool(
 
 server.tool(
   'search_user_history',
-  "Search the user's history for related albums (artist, year, genre, fuzzy search).",
+  "Search the user's history for related albums (artist, year, genre, fuzzy search). Data is cached for 4 hours.",
   {
     projectIdentifier: z.string().describe('The name of the project or the sharerId'),
     query: z.string().describe('Search query for artist, name, year, or genre'),
@@ -118,6 +118,34 @@ server.tool(
     });
     return {
       content: [{ type: 'text', text: JSON.stringify(filtered, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  'refresh_data',
+  'Force a refresh of cached data from the API.',
+  {
+    type: z.enum(['global', 'user', 'project', 'all']).describe('Type of data to refresh'),
+    projectIdentifier: z.string().optional().describe('Required if type is "project"'),
+  },
+  async ({ type, projectIdentifier }) => {
+    if (type === 'global') {
+      await client.getGlobalStats(true);
+    } else if (type === 'user') {
+      await client.getUserAlbumStats(true);
+    } else if (type === 'project') {
+      if (!projectIdentifier) {
+        throw new Error('projectIdentifier is required when type is "project"');
+      }
+      await client.getProject(projectIdentifier, true);
+    } else if (type === 'all') {
+      client.clearCache();
+      // We don't eagerly refetch everything here to avoid hitting rate limits too hard at once
+    }
+
+    return {
+      content: [{ type: 'text', text: `Successfully refreshed ${type} data.` }],
     };
   }
 );
