@@ -33,6 +33,17 @@ An MCP server for interacting with the [1001 Albums Generator](https://1001album
 
 This server is designed to be used with an MCP client (like Claude Desktop).
 
+### One-Click Installation (Claude Desktop)
+
+This server is available as a [Claude Desktop Extension (DXT)](https://github.com/t54-labs/dxt). You can find the `.dxt` files in the [GitHub Releases](https://github.com/bnm12/1001-albums-generator-mcp/releases) page.
+
+To install:
+1. Download either the local (`1001-albums-generator-mcp.dxt`) or remote (`1001-albums-generator-mcp-remote.dxt`) extension.
+2. Drag the `.dxt` file into your Claude Desktop settings.
+
+- **Local version**: Runs the server directly on your machine. Requires Node.js.
+- **Remote version**: Connects to the hosted version of this MCP server at `https://1001-albums-mcp.bnm12.dk/mcp`. Does not require local Node.js or setup.
+
 ### Running on Stdio
 
 ```bash

@@ -1,0 +1,24 @@
+{
+  "dxt_version": "0.1",
+  "name": "1001-albums-generator-mcp",
+  "display_name": "1001 Albums generator",
+  "version": "1.0.0",
+  "description": "A MCP server for interacting with 1001 albums generator",
+  "author": {
+    "name": "bnm12"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "MCP_MODE": "stdio"
+      }
+    }
+  },
+  "license": "ISC"
+}

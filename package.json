@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "1001-albums-generator-mcp",
   "version": "1.0.0",
   "description": "A MCP server for interacting with 1001 albums generator",
   "main": "index.js",
@@ -23,6 +23,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "axios": "^1.13.6",
+    "eventsource": "^4.1.0",
     "express": "^5.2.1",
     "zod": "^4.3.6"
   },
