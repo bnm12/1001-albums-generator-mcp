@@ -38,7 +38,7 @@ export interface GlobalStats {
 export interface UserAlbumHistoryEntry {
   generatedAlbumId: string;
   album: Album;
-  rating: number;
+  rating: number | string | undefined | null;
   review: string;
   votedAt?: string;
   generatedAt?: string;
