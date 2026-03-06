@@ -34,6 +34,58 @@ The following files must not be modified unless the task explicitly requires it:
   - `main()` — starts the server in either `stdio` or `sse` (Streamable HTTP) mode based on the `MCP_MODE` environment variable.
 - `src/test-api.ts` & `src/test-cache.ts`: Utility scripts for verifying API connectivity and caching logic.
 
+## 1001 Albums Generator Data Model
+
+The upstream API has three distinct datasets. Understanding which is which is essential for
+choosing the correct tool:
+
+| Dataset | API endpoint | What it contains |
+|---|---|---|
+| **Book list** | `GET /albums/stats` | The ~1001 canonical albums from the *1001 Albums You Must Hear Before You Die* book, with community ratings |
+| **User-submitted albums** | `GET /user-albums/stats` | Albums added by users across all projects worldwide that are **not** in the original book list, with community ratings |
+| **Project** | `GET /projects/:id` | A specific user's project: their generated history, personal ratings, written reviews, current album, and progress stats |
+
+The book list and user-submitted datasets contain **no per-project data** — no individual
+ratings, no reviews, no history. They are community-wide aggregates only.
+
+### Tool-to-dataset mapping (post-rework names)
+
+| Tool | Dataset | Use for |
+|---|---|---|
+| `list_book_album_stats` | Book list | Browsing/ranking the canonical 1001 albums |
+| `get_book_album_stat` | Book list | Looking up a specific book album's community stats |
+| `list_user_submitted_album_stats` | User-submitted | Browsing albums added by the community outside the book |
+| `get_project_stats` | Project | A user's progress: how many rated, current album, group info |
+| `list_project_history` | Project | Browsing a user's full listening history with their ratings |
+| `search_project_history` | Project | Searching a user's history by name, artist, year, or genre |
+| `get_album_detail` | Project | Full detail for one album: review, streaming links, metadata |
+| `get_album_of_the_day` | Project | The album currently assigned to a project |
+| `get_album_context` | Project | Relationships between one album and others in the history |
+
+### List vs. detail pattern
+
+List tools (`list_project_history`, `list_book_album_stats`, `list_user_submitted_album_stats`,
+`search_project_history`) return a **slim format** intentionally — images, streaming IDs,
+Wikipedia URLs, subgenres, and written reviews are stripped to keep responses in context.
+
+When you need any of the following, call `get_album_detail` first:
+- The user's written review for an album
+- Any streaming link (Spotify, Apple Music, Tidal, YouTube Music, etc.)
+- Wikipedia URL
+- Full genre/style/subgenre breakdown
+- Album artwork image URLs
+
+Use the `generatedAlbumId` from a list tool result to identify the album in `get_album_detail`.
+
+### `refresh_data` cache key mapping
+
+The `type` enum in `refresh_data` maps to internal caches as follows — do not rename these
+values:
+- `"global"` → book list cache (`/albums/stats`)
+- `"user"` → user-submitted albums cache (`/user-albums/stats`)
+- `"project"` → specific project cache (`/projects/:id`)
+- `"all"` → clears all caches
+
 ## HTTP Transport Architecture
 
 The server uses `StreamableHTTPServerTransport` (not the legacy `SSEServerTransport`). Key rules:
