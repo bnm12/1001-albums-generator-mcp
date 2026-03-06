@@ -2,11 +2,23 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { AlbumsGeneratorClient } from './api.js';
+import { AlbumsGeneratorClient, UserAlbumHistoryEntry } from './api.js';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 
 const client = new AlbumsGeneratorClient();
+
+export function calculateProjectStats(history: UserAlbumHistoryEntry[]) {
+  const albumsGenerated = history.length;
+  const albumsRated = history.filter((h) => typeof h.rating === 'number' && h.rating > 0).length;
+  const albumsUnrated = albumsGenerated - albumsRated;
+
+  return {
+    albumsGenerated,
+    albumsRated,
+    albumsUnrated,
+  };
+}
 
 function createMcpServer() {
   const server = new McpServer({
@@ -82,6 +94,7 @@ function createMcpServer() {
       const project = await client.getProject(projectIdentifier);
       // Remove history to keep summary small
       const { history, ...summary } = project;
+      const stats = calculateProjectStats(history);
       return {
         content: [
           {
@@ -89,9 +102,7 @@ function createMcpServer() {
             text: JSON.stringify(
               {
                 ...summary,
-                albumsGenerated: history.length,
-                albumsRated: history.filter((h) => h.rating > 0).length,
-                albumsUnrated: history.filter((h) => !h.rating).length,
+                ...stats,
               },
               null,
               2
