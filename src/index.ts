@@ -45,6 +45,32 @@ server.tool(
 );
 
 server.tool(
+  'get_album_of_the_day',
+  'Get the current album of the day for a given project. Data is cached for 4 hours.',
+  {
+    projectIdentifier: z.string().describe('The name of the project or the sharerId'),
+  },
+  async ({ projectIdentifier }) => {
+    const project = await client.getProject(projectIdentifier);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              currentAlbum: project.currentAlbum,
+              currentAlbumNotes: project.currentAlbumNotes,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
   'get_project_info',
   'Get general project information including history and current album. Data is cached for 4 hours.',
   {
@@ -96,6 +122,154 @@ server.tool(
     const stats = await client.getUserAlbumStats();
     return {
       content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  'lookup_album',
+  "Look up a specific album in a project's history by its name or ID (uuid or generatedAlbumId). Only returns one precise result. Data is cached for 4 hours.",
+  {
+    projectIdentifier: z.string().describe('The name of the project or the sharerId'),
+    albumIdentifier: z.string().describe('The name, UUID, or generatedAlbumId of the album'),
+  },
+  async ({ projectIdentifier, albumIdentifier }) => {
+    const project = await client.getProject(projectIdentifier);
+    const lowerId = albumIdentifier.toLowerCase();
+    const result = project.history.find((h) => {
+      return (
+        h.album.name.toLowerCase() === lowerId ||
+        h.album.uuid === albumIdentifier ||
+        h.generatedAlbumId === albumIdentifier
+      );
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result || null, null, 2) }],
+    };
+  }
+);
+
+server.tool(
+  'get_album_context',
+  "Provide a graph-like context for an album from a user's history, showing relationships with other albums (same artist, year, genre/style influence).",
+  {
+    projectIdentifier: z.string().describe('The name of the project or the sharerId'),
+    albumIdentifier:
+      z.string().describe('The name, UUID, or generatedAlbumId of the album to contextualize'),
+  },
+  async ({ projectIdentifier, albumIdentifier }) => {
+    const project = await client.getProject(projectIdentifier);
+    const lowerId = albumIdentifier.toLowerCase();
+    const targetEntry = project.history.find((h) => {
+      return (
+        h.album.name.toLowerCase() === lowerId ||
+        h.album.uuid === albumIdentifier ||
+        h.generatedAlbumId === albumIdentifier
+      );
+    });
+
+    if (!targetEntry) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Album "${albumIdentifier}" not found in project history.`,
+          },
+        ],
+      };
+    }
+
+    const targetAlbum = targetEntry.album;
+    const history = project.history;
+
+    const getArtists = (artistStr: string) => {
+      return artistStr
+        .split(/&|,|and|with/i)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+    };
+
+    const targetArtists = getArtists(targetAlbum.artist);
+    const getYear = (dateStr: string) => parseInt(dateStr);
+    const targetYear = getYear(targetAlbum.releaseDate);
+
+    const context = {
+      targetAlbum: {
+        name: targetAlbum.name,
+        artist: targetAlbum.artist,
+        releaseDate: targetAlbum.releaseDate,
+        genres: targetAlbum.genres,
+        styles: targetAlbum.styles,
+      },
+      sameArtist: history
+        .filter((h) => h.album.artist === targetAlbum.artist && h.album.uuid !== targetAlbum.uuid)
+        .map((h) => ({ name: h.album.name, releaseDate: h.album.releaseDate })),
+
+      sameYear: history
+        .filter((h) => getYear(h.album.releaseDate) === targetYear && h.album.uuid !== targetAlbum.uuid)
+        .map((h) => ({ name: h.album.name, artist: h.album.artist }))
+        .slice(0, 50),
+
+      // Potential influences (same genre, earlier year)
+      potentialInfluences: history
+        .filter(
+          (h) =>
+            h.album.uuid !== targetAlbum.uuid &&
+            getYear(h.album.releaseDate) < targetYear &&
+            h.album.genres.some((g) => targetAlbum.genres.includes(g))
+        )
+        .sort((a, b) => getYear(b.album.releaseDate) - getYear(a.album.releaseDate)) // Most recent first
+        .slice(0, 20)
+        .map((h) => ({
+          name: h.album.name,
+          artist: h.album.artist,
+          releaseDate: h.album.releaseDate,
+          sharedGenres: h.album.genres.filter((g) => targetAlbum.genres.includes(g)),
+        })),
+
+      // Potentially influenced (same genre, later year)
+      potentiallyInfluenced: history
+        .filter(
+          (h) =>
+            h.album.uuid !== targetAlbum.uuid &&
+            getYear(h.album.releaseDate) > targetYear &&
+            h.album.genres.some((g) => targetAlbum.genres.includes(g))
+        )
+        .sort((a, b) => getYear(a.album.releaseDate) - getYear(b.album.releaseDate)) // Closest in time first
+        .slice(0, 20)
+        .map((h) => ({
+          name: h.album.name,
+          artist: h.album.artist,
+          releaseDate: h.album.releaseDate,
+          sharedGenres: h.album.genres.filter((g) => targetAlbum.genres.includes(g)),
+        })),
+
+      // Same style
+      relatedByStyle: history
+        .filter(
+          (h) =>
+            h.album.uuid !== targetAlbum.uuid &&
+            h.album.styles?.some((s) => targetAlbum.styles?.includes(s))
+        )
+        .slice(0, 20)
+        .map((h) => ({
+          name: h.album.name,
+          artist: h.album.artist,
+          sharedStyles: h.album.styles?.filter((s) => targetAlbum.styles?.includes(s)),
+        })),
+
+      // Participating artists
+      relatedByParticipatingArtists: history
+        .filter((h) => {
+          if (h.album.uuid === targetAlbum.uuid) return false;
+          const otherArtists = getArtists(h.album.artist);
+          return targetArtists.some((ta) => otherArtists.includes(ta));
+        })
+        .map((h) => ({ name: h.album.name, artist: h.album.artist })),
+    };
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(context, null, 2) }],
     };
   }
 );

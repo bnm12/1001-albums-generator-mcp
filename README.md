@@ -55,6 +55,9 @@ The server will be available at `http://localhost:3000/sse`.
 - `get_user_history`: Read the user's entire album history.
 - `get_user_stats`: Get user album stats.
 - `search_user_history`: Search a user's history by artist, name, year, or genre.
+- `lookup_album`: Precise search for an album in history by name, UUID, or `generatedAlbumId`.
+- `get_album_of_the_day`: Get the current album of the day and its notes for a project.
+- `get_album_context`: Explore relationships between an album and others in the history (same artist, year, genre influence, style, collaborations).
 - `refresh_data`: Force a refresh of cached data.
 
 ## API Limits

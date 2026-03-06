@@ -7,6 +7,12 @@ async function test() {
     const project = await client.getProject('test');
     console.log('Project Name:', project.name);
     console.log('Albums Generated:', project.history.length);
+    if (project.history.length > 0) {
+      console.log('First history entry:', JSON.stringify(project.history[0], null, 2));
+    }
+    if (project.currentAlbum) {
+      console.log('Current album:', JSON.stringify(project.currentAlbum, null, 2));
+    }
 
     console.log('\nFetching global stats (this might take a while due to throttle if run repeatedly)...');
     // Note: If you run this immediately after the previous call, it will wait for MIN_REQUEST_INTERVAL (20s)

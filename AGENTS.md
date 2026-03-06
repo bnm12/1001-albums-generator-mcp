@@ -23,3 +23,11 @@ This repository contains an MCP server for the 1001 Albums Generator API.
 - Run `npm run build` to compile the TypeScript code.
 - Run `node dist/index.js` to start the server on stdio.
 - When adding new tools, ensure they benefit from the caching layer in `api.ts`.
+- When adding new tools, you **must** also update `README.md` with their descriptions.
+- The `get_album_context` tool implements logical limits (e.g., 20 items per category) on historical data to handle project histories of up to 2000 items while staying within LLM context limits.
+
+## Documentation Links
+
+- [MCP LLM Context](https://modelcontextprotocol.io/llms-full.txt)
+- [MCP TypeScript SDK](https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/refs/heads/main/README.md)
+- [1001 Albums API (Community JSON documentation)](https://www.reddit.com/r/1001AlbumsGenerator/comments/p6xw6y/json_api/)
