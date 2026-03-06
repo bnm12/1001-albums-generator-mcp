@@ -190,7 +190,7 @@ server.tool(
     };
 
     const targetArtists = getArtists(targetAlbum.artist);
-    const getYear = (dateStr: string) => parseInt(dateStr.substring(0, 4));
+    const getYear = (dateStr: string) => parseInt(dateStr);
     const targetYear = getYear(targetAlbum.releaseDate);
 
     const context = {
