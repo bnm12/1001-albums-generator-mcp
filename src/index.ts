@@ -190,6 +190,8 @@ server.tool(
     };
 
     const targetArtists = getArtists(targetAlbum.artist);
+    const getYear = (dateStr: string) => parseInt(dateStr.substring(0, 4));
+    const targetYear = getYear(targetAlbum.releaseDate);
 
     const context = {
       targetAlbum: {
@@ -204,19 +206,20 @@ server.tool(
         .map((h) => ({ name: h.album.name, releaseDate: h.album.releaseDate })),
 
       sameYear: history
-        .filter(
-          (h) => h.album.releaseDate === targetAlbum.releaseDate && h.album.uuid !== targetAlbum.uuid
-        )
-        .map((h) => ({ name: h.album.name, artist: h.album.artist })),
+        .filter((h) => getYear(h.album.releaseDate) === targetYear && h.album.uuid !== targetAlbum.uuid)
+        .map((h) => ({ name: h.album.name, artist: h.album.artist }))
+        .slice(0, 50),
 
       // Potential influences (same genre, earlier year)
       potentialInfluences: history
         .filter(
           (h) =>
             h.album.uuid !== targetAlbum.uuid &&
-            parseInt(h.album.releaseDate) < parseInt(targetAlbum.releaseDate) &&
+            getYear(h.album.releaseDate) < targetYear &&
             h.album.genres.some((g) => targetAlbum.genres.includes(g))
         )
+        .sort((a, b) => getYear(b.album.releaseDate) - getYear(a.album.releaseDate)) // Most recent first
+        .slice(0, 20)
         .map((h) => ({
           name: h.album.name,
           artist: h.album.artist,
@@ -229,9 +232,11 @@ server.tool(
         .filter(
           (h) =>
             h.album.uuid !== targetAlbum.uuid &&
-            parseInt(h.album.releaseDate) > parseInt(targetAlbum.releaseDate) &&
+            getYear(h.album.releaseDate) > targetYear &&
             h.album.genres.some((g) => targetAlbum.genres.includes(g))
         )
+        .sort((a, b) => getYear(a.album.releaseDate) - getYear(b.album.releaseDate)) // Closest in time first
+        .slice(0, 20)
         .map((h) => ({
           name: h.album.name,
           artist: h.album.artist,
@@ -246,6 +251,7 @@ server.tool(
             h.album.uuid !== targetAlbum.uuid &&
             h.album.styles?.some((s) => targetAlbum.styles?.includes(s))
         )
+        .slice(0, 20)
         .map((h) => ({
           name: h.album.name,
           artist: h.album.artist,
