@@ -60,16 +60,16 @@ The server will be available at `http://localhost:3000/mcp`.
 
 ### Tools
 
-- `get_global_stats`: Get all global album stats.
-- `get_global_album_stat`: Search for a specific album in global stats.
-- `get_project_info`: Get general project info and summaries.
-- `get_user_history`: Read the user's entire album history.
-- `get_user_stats`: Get user album stats.
-- `search_user_history`: Search a user's history by artist, name, year, or genre.
-- `lookup_album`: Precise search for an album in history by name, UUID, or `generatedAlbumId`.
-- `get_album_of_the_day`: Get the current album of the day and its notes for a project.
-- `get_album_context`: Explore relationships between an album and others in the history (same artist, year, genre influence, style, collaborations).
-- `refresh_data`: Force a refresh of cached data.
+- `list_book_album_stats`: Returns community voting statistics for all albums from the canonical "1001 Albums You Must Hear Before You Die" book list.
+- `get_book_album_stat`: Search the canonical book list by album name or artist.
+- `list_user_submitted_album_stats`: Returns community voting statistics for albums that users have submitted to 1001 Albums Generator projects which are NOT in the original book list.
+- `get_project_stats`: Returns summary statistics for a specific project.
+- `list_project_history`: Returns the full generated history for a project.
+- `get_album_detail`: Returns complete information for a single album from a project's history.
+- `search_project_history`: Searches a project's history by album name, artist, release year, or genre.
+- `get_album_of_the_day`: Returns the current album assigned to a project for today, including full album metadata and any notes added by the project owner.
+- `get_album_context`: Returns relationship data for a specific album within a project's history.
+- `refresh_data`: Force a refresh of cached data from the API.
 
 ## API Limits
 

@@ -30,9 +30,10 @@ function createMcpServer() {
     name: string,
     description: string,
     schema: T,
-    handler: (args: any) => Promise<any>
+    handler: (args: any) => Promise<any>,
+    readOnlyHint: boolean = false
   ) => {
-    server.tool(name, description, schema, (async (args: any) => {
+    const callback = (async (args: any) => {
       console.error(`[Tool Call] ${name}`, JSON.stringify(args));
       try {
         const result = await handler(args);
@@ -42,24 +43,41 @@ function createMcpServer() {
         console.error(`[Tool Error] ${name}`, error);
         throw error;
       }
-    }) as any);
+    }) as any;
+
+    if (readOnlyHint) {
+      server.tool(name, description, schema, { readOnlyHint: true }, callback);
+    } else {
+      server.tool(name, description, schema, callback);
+    }
   };
 
   registerTool(
-    'get_global_stats',
-    'Get all global album stats including votes, average rating, genres, and controversial score. Data is cached for 4 hours.',
+    'list_book_album_stats',
+    'Returns community voting statistics for all albums from the canonical "1001 Albums You Must Hear Before You Die" book list. Each entry includes: name, artist, release year, genres, total votes, average rating, controversial score, and vote distribution by grade (1–5). Use this to answer questions about the book list — e.g. "what is the highest rated book album?" or "find book albums in the jazz genre". For albums submitted by users outside the book list, use list_user_submitted_album_stats. Data is cached for 4 hours.',
     {},
     async () => {
       const stats = await client.getGlobalStats();
+      const slim = stats.stats.map((s) => ({
+        name: s.albumName,
+        artist: s.albumArtist,
+        releaseDate: (s as any).releaseDate,
+        genres: s.genres,
+        votes: s.votes,
+        averageRating: s.averageRating,
+        controversialScore: s.controversialScore,
+        votesByGrade: (s as any).votesByGrade,
+      }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
       };
-    }
+    },
+    true
   );
 
   registerTool(
-    'get_global_album_stat',
-    'Get statistics for a specific album from global stats by name or artist. Data is cached for 4 hours.',
+    'get_book_album_stat',
+    'Search the canonical book list by album name or artist. Returns matching entries with community voting stats (votes, average rating, controversial score, vote breakdown). Only searches the ~1001 albums from the original book — for user-submitted albums outside the book list, use list_user_submitted_album_stats. Data is cached for 4 hours.',
     {
       query: z.string().describe('Search query for album name or artist'),
     },
@@ -71,15 +89,26 @@ function createMcpServer() {
           s.albumName.toLowerCase().includes(lowerQuery) ||
           s.albumArtist.toLowerCase().includes(lowerQuery)
       );
+      const slim = filtered.map((s) => ({
+        name: s.albumName,
+        artist: s.albumArtist,
+        releaseDate: (s as any).releaseDate,
+        genres: s.genres,
+        votes: s.votes,
+        averageRating: s.averageRating,
+        controversialScore: s.controversialScore,
+        votesByGrade: (s as any).votesByGrade,
+      }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(filtered, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
       };
-    }
+    },
+    true
   );
 
   registerTool(
     'get_album_of_the_day',
-    'Get the current album of the day for a given project. Data is cached for 4 hours.',
+    'Returns the current album assigned to a project for today, including full album metadata and any notes added by the project owner. This is the album the user is currently listening to and has not yet rated. Requires a projectIdentifier. Data is cached for 4 hours.',
     {
       projectIdentifier: z.string().describe('The name of the project or the sharerId'),
     },
@@ -100,12 +129,13 @@ function createMcpServer() {
           },
         ],
       };
-    }
+    },
+    true
   );
 
   registerTool(
-    'get_project_info',
-    'Get general project information including history and current album. Data is cached for 4 hours.',
+    'get_project_stats',
+    'Returns summary statistics for a specific project: total albums generated, number rated, number unrated, current album of the day (with full detail), update frequency, and group membership. Use this when asked about a user\'s progress — e.g. "how many albums has the user rated?" or "what is the user\'s current album?". For the full rated/unrated history, use list_project_history. Requires a projectIdentifier (project name or sharerId). Data is cached for 4 hours.',
     {
       projectIdentifier: z.string().describe('The name of the project or the sharerId'),
     },
@@ -114,6 +144,9 @@ function createMcpServer() {
       // Remove history to keep summary small
       const { history, ...summary } = project;
       const stats = calculateProjectStats(history);
+      const currentAlbum = project.currentAlbum
+        ? (({ images, slug, ...rest }: any) => rest)(project.currentAlbum)
+        : null;
       return {
         content: [
           {
@@ -121,6 +154,7 @@ function createMcpServer() {
             text: JSON.stringify(
               {
                 ...summary,
+                currentAlbum,
                 ...stats,
               },
               null,
@@ -129,38 +163,61 @@ function createMcpServer() {
           },
         ],
       };
-    }
+    },
+    true
   );
 
   registerTool(
-    'get_user_history',
-    "Read the user's entire album history. Data is cached for 4 hours.",
+    'list_project_history',
+    "Returns the full generated history for a project. Each entry includes: generatedAlbumId, album name, artist, release year, genres, the user's rating (1–5, or null if unrated), global community rating, and date generated. Reviews and full album detail (streaming IDs, images, Wikipedia, subgenres) are intentionally omitted to keep the response manageable — use get_album_detail to retrieve complete information for a specific album. Use this to browse, filter, or analyse the user's listening history. Requires a projectIdentifier. Data is cached for 4 hours.",
     {
       projectIdentifier: z.string().describe('The name of the project or the sharerId'),
     },
     async ({ projectIdentifier }) => {
       const project = await client.getProject(projectIdentifier);
+      const slim = project.history.map((h) => ({
+        generatedAlbumId: h.generatedAlbumId,
+        name: h.album.name,
+        artist: h.album.artist,
+        releaseDate: h.album.releaseDate,
+        genres: h.album.genres,
+        rating: h.rating ?? null,
+        globalRating: h.globalRating,
+        generatedAt: h.generatedAt,
+      }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(project.history, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
       };
-    }
+    },
+    true
   );
 
   registerTool(
-    'get_user_stats',
-    'Get user album stats (votes, average score, genres, etc.). Data is cached for 4 hours.',
+    'list_user_submitted_album_stats',
+    'Returns community voting statistics for albums that users have submitted to 1001 Albums Generator projects which are NOT in the original book list. Each entry includes: name, artist, release year, genres, votes, average rating, controversial score, and vote breakdown. Contains no data specific to any individual project — for a project\'s own history and ratings, use get_project_stats or list_project_history instead. Data is cached for 4 hours.',
     {},
     async () => {
       const stats = await client.getUserAlbumStats();
+      const slim = (stats as any).albums.map((a: any) => ({
+        name: a.name,
+        artist: a.artist,
+        releaseDate: a.releaseDate,
+        genres: a.genres,
+        votes: a.votes,
+        averageRating: a.averageRating,
+        controversialScore: a.controversialScore,
+        votesByGrade: a.votesByGrade,
+      }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
       };
-    }
+    },
+    true
   );
 
   registerTool(
-    'lookup_album',
-    "Look up a specific album in a project's history by its name or ID (uuid or generatedAlbumId). Only returns one precise result. Data is cached for 4 hours.",
+    'get_album_detail',
+    'Returns complete information for a single album from a project\'s history. Includes full album metadata (name, artist, release year, genres, styles, subgenres, Wikipedia URL, all streaming IDs: Spotify, Apple Music, Tidal, Amazon Music, YouTube Music, Qobuz, Deezer), the user\'s rating and full written review, global community rating, reveal status, and date generated. Use this when you need to read a review, find a streaming link, or prepare a detailed presentation for a specific album. Identify the album using its name, UUID, or generatedAlbumId (available from list_project_history or search_project_history). Requires a projectIdentifier. Data is cached for 4 hours.',
     {
       projectIdentifier: z.string().describe('The name of the project or the sharerId'),
       albumIdentifier: z.string().describe('The name, UUID, or generatedAlbumId of the album'),
@@ -178,12 +235,13 @@ function createMcpServer() {
       return {
         content: [{ type: 'text', text: JSON.stringify(result || null, null, 2) }],
       };
-    }
+    },
+    true
   );
 
   registerTool(
     'get_album_context',
-    "Provide a graph-like context for an album from a user's history, showing relationships with other albums (same artist, year, genre/style influence).",
+    "Returns relationship data for a specific album within a project's history: other albums by the same artist, albums from the same year, potential influences (same genre, earlier release), potentially influenced works (same genre, later release), albums sharing styles, and albums with overlapping artists. Useful for understanding an album's place in the user's listening journey. Identify the album by name, UUID, or generatedAlbumId. Requires a projectIdentifier. Data is cached for 4 hours.",
     {
       projectIdentifier: z.string().describe('The name of the project or the sharerId'),
       albumIdentifier:
@@ -307,8 +365,8 @@ function createMcpServer() {
   );
 
   registerTool(
-    'search_user_history',
-    "Search the user's history for related albums (artist, year, genre, fuzzy search). Data is cached for 4 hours.",
+    'search_project_history',
+    'Searches a project\'s history by album name, artist, release year, or genre. Returns matching entries in the same slim format as list_project_history (generatedAlbumId, name, artist, year, genres, rating, globalRating, generatedAt — no reviews or streaming links). Use get_album_detail for full information on any result. Requires a projectIdentifier and a query string. Data is cached for 4 hours.',
     {
       projectIdentifier: z.string().describe('The name of the project or the sharerId'),
       query: z.string().describe('Search query for artist, name, year, or genre'),
@@ -324,10 +382,21 @@ function createMcpServer() {
           h.album.genres.some((g: string) => g.toLowerCase().includes(lowerQuery))
         );
       });
+      const slim = filtered.map((h) => ({
+        generatedAlbumId: h.generatedAlbumId,
+        name: h.album.name,
+        artist: h.album.artist,
+        releaseDate: h.album.releaseDate,
+        genres: h.album.genres,
+        rating: h.rating ?? null,
+        globalRating: h.globalRating,
+        generatedAt: h.generatedAt,
+      }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(filtered, null, 2) }],
+        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
       };
-    }
+    },
+    true
   );
 
   registerTool(
@@ -338,6 +407,9 @@ function createMcpServer() {
       projectIdentifier: z.string().optional().describe('Required if type is "project"'),
     },
     async ({ type, projectIdentifier }) => {
+      // "global" clears the book list cache (/albums/stats)
+      // "user" clears the user-submitted albums cache (/user-albums/stats)
+      // "project" clears a specific project cache (/projects/:id)
       if (type === 'global') {
         await client.getGlobalStats(true);
       } else if (type === 'user') {
