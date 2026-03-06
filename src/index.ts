@@ -26,7 +26,26 @@ function createMcpServer() {
     version: '1.0.0',
   });
 
-  server.tool(
+  const registerTool = <T extends z.ZodRawShape>(
+    name: string,
+    description: string,
+    schema: T,
+    handler: (args: any) => Promise<any>
+  ) => {
+    server.tool(name, description, schema, (async (args: any) => {
+      console.error(`[Tool Call] ${name}`, JSON.stringify(args));
+      try {
+        const result = await handler(args);
+        console.error(`[Tool Success] ${name}`);
+        return result;
+      } catch (error) {
+        console.error(`[Tool Error] ${name}`, error);
+        throw error;
+      }
+    }) as any);
+  };
+
+  registerTool(
     'get_global_stats',
     'Get all global album stats including votes, average rating, genres, and controversial score. Data is cached for 4 hours.',
     {},
@@ -38,7 +57,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'get_global_album_stat',
     'Get statistics for a specific album from global stats by name or artist. Data is cached for 4 hours.',
     {
@@ -58,7 +77,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'get_album_of_the_day',
     'Get the current album of the day for a given project. Data is cached for 4 hours.',
     {
@@ -84,7 +103,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'get_project_info',
     'Get general project information including history and current album. Data is cached for 4 hours.',
     {
@@ -113,7 +132,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'get_user_history',
     "Read the user's entire album history. Data is cached for 4 hours.",
     {
@@ -127,7 +146,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'get_user_stats',
     'Get user album stats (votes, average score, genres, etc.). Data is cached for 4 hours.',
     {},
@@ -139,7 +158,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'lookup_album',
     "Look up a specific album in a project's history by its name or ID (uuid or generatedAlbumId). Only returns one precise result. Data is cached for 4 hours.",
     {
@@ -162,7 +181,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'get_album_context',
     "Provide a graph-like context for an album from a user's history, showing relationships with other albums (same artist, year, genre/style influence).",
     {
@@ -287,7 +306,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'search_user_history',
     "Search the user's history for related albums (artist, year, genre, fuzzy search). Data is cached for 4 hours.",
     {
@@ -311,7 +330,7 @@ function createMcpServer() {
     }
   );
 
-  server.tool(
+  registerTool(
     'refresh_data',
     'Force a refresh of cached data from the API.',
     {
@@ -356,11 +375,14 @@ async function main() {
           req.headers['mcp-session-id'] ||
           req.headers['x-session-id']) as string | undefined;
 
+        console.error(`[HTTP] ${req.method} /mcp${sessionId ? ` (Session: ${sessionId})` : ''}`);
+
         if (sessionId) {
           const transport = transports.get(sessionId);
           if (transport) {
             await transport.handleRequest(req, res);
           } else {
+            console.error(`[HTTP] Session not found: ${sessionId}`);
             res.status(400).send('Session not found');
           }
         } else {
@@ -370,6 +392,7 @@ async function main() {
 
           transport.onclose = () => {
             if (transport.sessionId) {
+              console.error(`[HTTP] Session closed: ${transport.sessionId}`);
               transports.delete(transport.sessionId);
             }
           };
@@ -379,10 +402,12 @@ async function main() {
           await transport.handleRequest(req, res);
 
           if (transport.sessionId) {
+            console.error(`[HTTP] Session created: ${transport.sessionId}`);
             transports.set(transport.sessionId, transport);
           }
         }
       } catch (err) {
+        console.error('[HTTP] Request error', err);
         next(err);
       }
     });
