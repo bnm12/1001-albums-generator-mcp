@@ -66,7 +66,7 @@ interface CacheEntry<T> {
 
 export class AlbumsGeneratorClient {
   private axiosInstance: AxiosInstance;
-  private lastRequestTime: number = 0;
+  private throttlePromise: Promise<void> = Promise.resolve();
   private readonly MIN_REQUEST_INTERVAL = 20000; // 3 requests per minute = 1 request every 20 seconds
   private readonly CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
 
@@ -81,13 +81,13 @@ export class AlbumsGeneratorClient {
   }
 
   private async throttle() {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-    if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-      const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-    }
-    this.lastRequestTime = Date.now();
+    const nextThrottle = this.throttlePromise.then(async () => {
+      await new Promise((resolve) => setTimeout(resolve, this.MIN_REQUEST_INTERVAL));
+    });
+
+    const currentThrottle = this.throttlePromise;
+    this.throttlePromise = nextThrottle;
+    await currentThrottle;
   }
 
   private isCacheValid<T>(entry: CacheEntry<T> | null | undefined): entry is CacheEntry<T> {
