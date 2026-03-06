@@ -148,6 +148,14 @@ Restart Claude Desktop after any config change.
 | `get_album_detail`       | Complete detail for one album: review, streaming links, Wikipedia, subgenres |
 | `get_album_context`      | Relationships: same artist, same year, influences, styles, collaborators     |
 
+### Group Tools
+
+| Tool                     | Description                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `get_group`              | Group summary: members, current album, all-time high and low scoring albums  |
+| `get_group_latest_album` | Latest group album with all member votes attached                            |
+| `get_group_album_reviews`| All member reviews and ratings for a specific group album                   |
+
 ### Community Tools
 
 | Tool                              | Description                                               |
@@ -158,9 +166,9 @@ Restart Claude Desktop after any config change.
 
 ### Utility
 
-| Tool           | Description                                                       |
-| -------------- | ----------------------------------------------------------------- |
-| `refresh_data` | Force-refresh cached data (`global`, `user`, `project`, or `all`) |
+| Tool           | Description                                                                    |
+| -------------- | ------------------------------------------------------------------------------ |
+| `refresh_data` | Force-refresh cached data (`global`, `user`, `project`, `group`, or `all`)     |
 
 > **Note on detail vs. list tools:** List and search tools return a slim format — no reviews, streaming IDs, or images — to keep responses concise. Call `get_album_detail` when you need a written review, a Spotify/Apple Music link, or full genre breakdown.
 
