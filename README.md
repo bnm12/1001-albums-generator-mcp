@@ -45,7 +45,7 @@ node dist/index.js
 MCP_MODE=sse PORT=3000 node dist/index.js
 ```
 
-The server will be available at `http://localhost:3000/sse`.
+The server will be available at `http://localhost:3000/mcp`.
 
 ### Tools
 
