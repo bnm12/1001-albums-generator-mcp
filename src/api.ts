@@ -1,13 +1,25 @@
 import axios, { AxiosInstance } from 'axios';
 
 export interface Album {
+  uuid: string;
   name: string;
   artist: string;
+  artistOrigin?: string;
+  slug: string;
   images: { url: string; width: number; height: number }[];
   releaseDate: string;
-  spotifyId: string;
-  wikipediaUrl: string;
   genres: string[];
+  styles?: string[];
+  subGenres?: string[];
+  spotifyId?: string;
+  appleMusicId?: string;
+  tidalId?: number;
+  amazonMusicId?: string;
+  youtubeMusicId?: string;
+  qobuzId?: string;
+  deezerId?: string;
+  wikipediaUrl: string;
+  globalReviewsUrl?: string;
 }
 
 export interface AlbumStat {
@@ -24,10 +36,14 @@ export interface GlobalStats {
 }
 
 export interface UserAlbumHistoryEntry {
+  generatedAlbumId: string;
   album: Album;
   rating: number;
   review: string;
-  votedAt: string;
+  votedAt?: string;
+  generatedAt?: string;
+  revealedAlbum?: boolean;
+  globalRating?: number;
 }
 
 export interface UserAlbumStats {
