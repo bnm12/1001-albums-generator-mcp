@@ -332,23 +332,34 @@ async function main() {
     const app = express();
     const port = process.env.PORT || 3000;
 
-    let transport: SSEServerTransport | null = null;
+    const transports = new Map<string, SSEServerTransport>();
 
     app.get('/sse', async (req, res) => {
-      transport = new SSEServerTransport('/message', res);
+      const transport = new SSEServerTransport('/message', res);
+      transports.set(transport.sessionId, transport);
+
+      transport.onclose = () => {
+        transports.delete(transport.sessionId);
+      };
+
       await server.connect(transport);
     });
 
     app.post('/message', async (req, res) => {
+      const sessionId = req.query.sessionId as string;
+      const transport = transports.get(sessionId);
+
       if (transport) {
         await transport.handlePostMessage(req, res);
       } else {
-        res.status(400).send('No active SSE session');
+        res.status(400).send('Session not found');
       }
     });
 
     app.listen(port, () => {
-      console.error(`1001 Albums Generator MCP Server running on SSE at http://localhost:${port}/sse`);
+      console.error(
+        `1001 Albums Generator MCP Server running on SSE at http://localhost:${port}/sse`
+      );
     });
   } else {
     const transport = new StdioServerTransport();
