@@ -58,15 +58,15 @@ function createMcpServer() {
     {},
     async () => {
       const stats = await client.getGlobalStats();
-      const slim = stats.stats.map((s) => ({
-        name: s.albumName,
-        artist: s.albumArtist,
-        releaseDate: (s as any).releaseDate,
+      const slim = stats.albums.map((s) => ({
+        name: s.name,
+        artist: s.artist,
+        releaseDate: s.releaseDate,
         genres: s.genres,
         votes: s.votes,
         averageRating: s.averageRating,
         controversialScore: s.controversialScore,
-        votesByGrade: (s as any).votesByGrade,
+        votesByGrade: s.votesByGrade,
       }));
       return {
         content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
@@ -84,20 +84,20 @@ function createMcpServer() {
     async ({ query }) => {
       const allStats = await client.getGlobalStats();
       const lowerQuery = query.toLowerCase();
-      const filtered = allStats.stats.filter(
+      const filtered = allStats.albums.filter(
         (s) =>
-          s.albumName.toLowerCase().includes(lowerQuery) ||
-          s.albumArtist.toLowerCase().includes(lowerQuery)
+          s.name.toLowerCase().includes(lowerQuery) ||
+          s.artist.toLowerCase().includes(lowerQuery)
       );
       const slim = filtered.map((s) => ({
-        name: s.albumName,
-        artist: s.albumArtist,
-        releaseDate: (s as any).releaseDate,
+        name: s.name,
+        artist: s.artist,
+        releaseDate: s.releaseDate,
         genres: s.genres,
         votes: s.votes,
         averageRating: s.averageRating,
         controversialScore: s.controversialScore,
-        votesByGrade: (s as any).votesByGrade,
+        votesByGrade: s.votesByGrade,
       }));
       return {
         content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
@@ -198,7 +198,7 @@ function createMcpServer() {
     {},
     async () => {
       const stats = await client.getUserAlbumStats();
-      const slim = (stats as any).albums.map((a: any) => ({
+      const slim = stats.albums.map((a) => ({
         name: a.name,
         artist: a.artist,
         releaseDate: a.releaseDate,

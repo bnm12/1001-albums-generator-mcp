@@ -23,16 +23,18 @@ export interface Album {
 }
 
 export interface AlbumStat {
-  albumName: string;
-  albumArtist: string;
+  name: string;
+  artist: string;
   averageRating: number;
   votes: number;
   genres: string[];
   controversialScore: number;
+  releaseDate?: string;
+  votesByGrade?: { [key: string]: number };
 }
 
 export interface GlobalStats {
-  stats: AlbumStat[];
+  albums: AlbumStat[];
 }
 
 export interface UserAlbumHistoryEntry {
@@ -47,9 +49,7 @@ export interface UserAlbumHistoryEntry {
 }
 
 export interface UserAlbumStats {
-  name: string;
-  totalVotes: number;
-  stats: UserAlbumHistoryEntry[];
+  albums: AlbumStat[];
 }
 
 export interface ProjectInfo {
