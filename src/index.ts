@@ -1103,6 +1103,291 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
     }
   );
 
+  // MCP Prompt Templates
+  // Prompt 1: todays-album
+  server.prompt(
+    'todays-album',
+    "Get background and context on today's assigned album",
+    {
+      projectIdentifier: z.string().describe('Your project name or sharerId'),
+    },
+    (args: { projectIdentifier: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, fetch today's album for project "${args.projectIdentifier}" and give me a rich introduction to it. Cover: what makes it historically significant, its place in the artist's career, why it was included in the 1001 Albums book, and what the community thinks of it. If the album has notable connections to others in my listening history, mention those too.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 2: predict-my-rating
+  server.prompt(
+    'predict-my-rating',
+    "Predict how you'll rate today's album based on your history and past reviews",
+    {
+      projectIdentifier: z.string().describe('Your project name or sharerId'),
+    },
+    (args: { projectIdentifier: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${args.projectIdentifier}" and explain your reasoning.
+
+To do this well, you should:
+1. Fetch today's album using get_album_of_the_day to know what it is
+2. Fetch my taste profile using get_taste_profile to understand my genre preferences, decade affinities, rating tendencies, and community alignment
+3. Search my history using search_project_history for albums in the same genre, style, or by the same artist to find relevant past ratings and reviews
+4. Use get_album_context to understand how this album fits musically into what I've already heard
+5. Use get_rating_outliers to understand whether I tend to agree or disagree with the community on albums like this
+
+Then give me a specific predicted rating (e.g. 3.5/5) with a confidence level and a detailed explanation of your reasoning — referencing my actual past ratings and reviews as evidence. Flag any uncertainties, e.g. if I have little history in this genre.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 3: taste-profile
+  server.prompt(
+    'taste-profile',
+    'Get a full analysis of your music taste based on your listening history',
+    {
+      projectIdentifier: z.string().describe('Your project name or sharerId'),
+    },
+    (args: { projectIdentifier: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, build a comprehensive profile of my music taste for project "${args.projectIdentifier}".
+
+Use get_taste_profile as the foundation, then enrich it with get_rating_outliers to identify where I diverge most from the community. I want to understand:
+- What genres, decades, and styles dominate my history
+- How I rate compared to the community — am I a generous or harsh rater, and do I tend to agree or disagree with the crowd?
+- Which albums I loved that others didn't, and which community favourites left me cold
+- What kind of listener I am overall — give me a short "listener archetype" summary at the end, like a music personality profile`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 4: album-deep-dive
+  server.prompt(
+    'album-deep-dive',
+    'Get a deep contextual analysis of a specific album in your history',
+    {
+      projectIdentifier: z.string().describe('Your project name or sharerId'),
+      albumName: z.string().describe('The name of the album to analyse'),
+    },
+    (args: { projectIdentifier: string; albumName: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, give me a deep dive on "${args.albumName}" from my project "${args.projectIdentifier}".
+
+Use get_album_context to explore:
+- The artist arc: how does this album fit into everything else I've heard from this artist, and how did I rate their other work?
+- Musical connections: which other albums in my history are most closely related by genre and style?
+- My listening journey: what was I hearing just before and after this album, and does it represent a turning point or a continuation?
+- Community divergence: did I rate this in line with the community or did I diverge significantly — and is that typical of me?
+
+Also use get_album_detail to retrieve my written review if I left one. Synthesise everything into a narrative about what this album means in the context of my listening history.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 5: rating-outliers
+  server.prompt(
+    'rating-outliers',
+    'Find the albums where your taste diverges most from the community',
+    {
+      projectIdentifier: z.string().describe('Your project name or sharerId'),
+    },
+    (args: { projectIdentifier: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, find the albums where my ratings for project "${args.projectIdentifier}" diverge most from the global community.
+
+Use get_rating_outliers (direction "both") to get my biggest divergences in each direction, and use get_taste_profile to contextualise whether I'm generally a contrarian or whether these are exceptional cases.
+
+Present two lists:
+1. Albums I loved that the community is cooler on — my "underrated gems"
+2. Albums the community loves that I was cold on — my "controversial takes"
+
+For each, include the album name, artist, my rating, the community average, and the divergence. Then give me a short reflection on what these outliers reveal about my taste.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 6: genre-journey
+  server.prompt(
+    'genre-journey',
+    'Explore how your genre exposure has evolved over your listening history',
+    {
+      projectIdentifier: z.string().describe('Your project name or sharerId'),
+    },
+    (args: { projectIdentifier: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, trace how my genre exposure has evolved over time for project "${args.projectIdentifier}".
+
+Use list_project_history to get my full history in chronological order (sorted by generatedAt), then analyse how the genres shift across the timeline. I want to know:
+- Did I go through distinct phases or "eras" dominated by a particular genre?
+- Are there genres I encountered early and never returned to, or ones that keep recurring?
+- Has my listening broadened over time or stayed focused?
+- What does the progression say about the generator's sequencing?
+
+Present the journey as a narrative arc, not just a list of statistics.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 7: group-latest-album
+  server.prompt(
+    'group-latest-album',
+    "See how your group rated their latest album and spark a discussion",
+    {
+      groupSlug: z.string().describe('Your group slug from the group page URL'),
+    },
+    (args: { groupSlug: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, fetch the latest album for group "${args.groupSlug}" and give me a full breakdown of how the group responded to it.
+
+Use get_group_latest_album to get the album and all member votes. Then:
+- Summarise how the group rated it overall vs the community average
+- Highlight who rated it highest and lowest, and how wide the spread was
+- Flag whether this was a divisive album for the group or a consensus one
+- Give some background on the album itself and why opinions might vary
+
+End with a discussion prompt or question that could spark conversation in the group about this album.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 8: group-compatibility
+  server.prompt(
+    'group-compatibility',
+    'Find out who in your group has the most similar and most different taste',
+    {
+      groupSlug: z.string().describe('Your group slug from the group page URL'),
+    },
+    (args: { groupSlug: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, analyse the taste compatibility across all members of group "${args.groupSlug}".
+
+Use get_group_compatibility_matrix to get the full pairwise similarity scores, then give me:
+- The most compatible pair in the group and what their shared taste looks like
+- The least compatible pair — the two members who disagree most
+- The most agreeable member (highest average similarity) and the group outlier (lowest average)
+- Any affinity clusters — sub-groups who seem to share a strong taste alignment
+- A short personality summary for the group as a whole: are you a cohesive group or a diverse one?
+
+Make it conversational and fun — this should feel like a music compatibility report, not a spreadsheet.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 9: group-divisive-albums
+  server.prompt(
+    'group-divisive-albums',
+    'Find the albums that divided your group most — and the ones you all agreed on',
+    {
+      groupSlug: z.string().describe('Your group slug from the group page URL'),
+    },
+    (args: { groupSlug: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${args.groupSlug}".
+
+Use get_group_album_insights to get the most divisive and most consensus albums. For the top divisive albums, use get_group_album_reviews to get the individual member reviews and ratings so you can show exactly who loved it and who didn't.
+
+Present it in two sections:
+1. "The Great Debates" — albums that split the group, with each member's rating shown and a note on what made it so divisive
+2. "Rare Agreements" — albums where everyone was on the same page, noting whether that was universal love or universal disappointment
+
+End with a reflection on what the pattern of disagreements reveals about the group's taste diversity.`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 10: compare-members
+  server.prompt(
+    'compare-members',
+    'Get a detailed taste comparison between two group members',
+    {
+      projectIdentifierA: z.string().describe("First member's project name or sharerId"),
+      projectIdentifierB: z.string().describe("Second member's project name or sharerId"),
+    },
+    (args: { projectIdentifierA: string; projectIdentifierB: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, give me a detailed taste comparison between "${args.projectIdentifierA}" and "${args.projectIdentifierB}".
+
+Use get_group_member_comparison to get the full breakdown, then enrich it by fetching each member's taste profile using get_taste_profile.
+
+Cover:
+- Their overall taste similarity score and what it means in practice
+- Where they agree most — shared genres, decades, and albums they both rated highly
+- Where they diverge most — the albums they rated most differently, and what those disagreements reveal
+- Who is the harsher rater of the two, and whether that affects how you interpret divergences
+- A verdict: are these two musically compatible, or do they bring completely different sensibilities to the group?`,
+        },
+      }],
+    })
+  );
+
+  // Prompt 11: listening-wrapped
+  server.prompt(
+    'listening-wrapped',
+    'Get a Spotify Wrapped-style summary of your listening history',
+    {
+      projectIdentifier: z.string().describe('Your project name or sharerId'),
+    },
+    (args: { projectIdentifier: string }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: `Using the 1001 Albums tools, create a Spotify Wrapped-style summary of my listening history for project "${args.projectIdentifier}".
+
+Use get_taste_profile as the foundation and get_rating_outliers for the most surprising moments. Make it punchy, visual in feel, and fun — like an end-of-year review. Include:
+- Total albums heard and rated
+- Top genre and decade
+- Most listened artist
+- Highest rated album and lowest rated album
+- Biggest "controversial take" (where I diverged most from the community)
+- A one-sentence listener archetype that captures my taste personality
+- A made-up "album of my year" — the single album that best represents my listening journey
+
+Format it as a series of bold headline stats followed by short punchy commentary on each.`,
+        },
+      }],
+    })
+  );
+
   return server;
 }
 

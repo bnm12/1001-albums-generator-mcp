@@ -150,27 +150,27 @@ Restart Claude Desktop after any config change.
 
 ### Group Tools
 
-| Tool                     | Description                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------- |
-| `get_group`              | Group summary: members, current album, all-time high and low scoring albums  |
-| `get_group_latest_album` | Latest group album with all member votes attached                            |
-| `get_group_album_reviews`| All member reviews and ratings for a specific group album                   |
+| Tool                      | Description                                                                 |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `get_group`               | Group summary: members, current album, all-time high and low scoring albums |
+| `get_group_latest_album`  | Latest group album with all member votes attached                           |
+| `get_group_album_reviews` | All member reviews and ratings for a specific group album                   |
 
 ### Analysis Tools
 
-| Tool | Description |
-|---|---|
-| `get_taste_profile` | Comprehensive taste profile: decade distribution, top genres/styles/artists, rating tendencies, community alignment |
-| `get_rating_outliers` | Albums where the user diverges most from community consensus, in either direction |
-| `get_album_context` | Rich contextual data: artist arc, musical connections, community divergence, listening journey |
+| Tool                  | Description                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `get_taste_profile`   | Comprehensive taste profile: decade distribution, top genres/styles/artists, rating tendencies, community alignment |
+| `get_rating_outliers` | Albums where the user diverges most from community consensus, in either direction                                   |
+| `get_album_context`   | Rich contextual data: artist arc, musical connections, community divergence, listening journey                      |
 
 ### Group Analysis Tools
 
-| Tool | Description |
-|---|---|
-| `get_group_album_insights` | Most divisive and most consensus albums across a group, ranked by rating variance |
+| Tool                          | Description                                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `get_group_album_insights`    | Most divisive and most consensus albums across a group, ranked by rating variance                     |
 | `get_group_member_comparison` | Side-by-side taste comparison between two members: similarity score, shared albums, rating divergence |
-| `compare_projects` | High-level comparison of two projects: genre affinity, decade preferences, overlap, rating tendencies |
+| `compare_projects`            | High-level comparison of two projects: genre affinity, decade preferences, overlap, rating tendencies |
 
 ### Community Tools
 
@@ -182,13 +182,31 @@ Restart Claude Desktop after any config change.
 
 ### Utility
 
-| Tool           | Description                                                                    |
-| -------------- | ------------------------------------------------------------------------------ |
-| `refresh_data` | Force-refresh cached data (`global`, `user`, `project`, `group`, or `all`)     |
+| Tool           | Description                                                                |
+| -------------- | -------------------------------------------------------------------------- |
+| `refresh_data` | Force-refresh cached data (`global`, `user`, `project`, `group`, or `all`) |
 
 > **Note on detail vs. list tools:** List and search tools return a slim format — no reviews, streaming IDs, or images — to keep responses concise. Call `get_album_detail` when you need a written review, a Spotify/Apple Music link, or full genre breakdown.
 
 ---
+
+## 💬 Prompt Templates
+
+Compatible clients (e.g. Claude Desktop) surface these as one-click conversation starters.
+
+| Prompt                  | Description                                                      |
+| ----------------------- | ---------------------------------------------------------------- |
+| `todays-album`          | Background and context on today's assigned album                 |
+| `predict-my-rating`     | Predict how you'll rate today's album based on your history      |
+| `taste-profile`         | Full analysis of your music taste and listener archetype         |
+| `album-deep-dive`       | Deep contextual analysis of a specific album in your history     |
+| `rating-outliers`       | Albums where your taste diverges most from the community         |
+| `genre-journey`         | How your genre exposure has evolved over time                    |
+| `group-latest-album`    | How your group rated their latest album                          |
+| `group-compatibility`   | Who in your group has the most similar and different taste       |
+| `group-divisive-albums` | Albums that divided your group most — and ones you all agreed on |
+| `compare-members`       | Detailed taste comparison between two group members              |
+| `listening-wrapped`     | Spotify Wrapped-style summary of your listening history          |
 
 ## 💬 Example Prompts
 
