@@ -1,16 +1,18 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { z } from 'zod';
-import { AlbumsGeneratorClient, UserAlbumHistoryEntry } from './api.js';
-import { randomUUID } from 'node:crypto';
-import express from 'express';
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
+import { AlbumsGeneratorClient, UserAlbumHistoryEntry } from "./api.js";
+import { randomUUID } from "node:crypto";
+import express from "express";
 
 const client = new AlbumsGeneratorClient();
 
 export function calculateProjectStats(history: UserAlbumHistoryEntry[]) {
   const albumsGenerated = history.length;
-  const albumsRated = history.filter((h) => typeof h.rating === 'number' && h.rating > 0).length;
+  const albumsRated = history.filter(
+    (h) => typeof h.rating === "number" && h.rating > 0,
+  ).length;
   const albumsUnrated = albumsGenerated - albumsRated;
 
   return {
@@ -29,7 +31,9 @@ function getDecade(year: number): string {
 }
 
 function getRatedEntries(history: UserAlbumHistoryEntry[]) {
-  return history.filter((h) => typeof h.rating === 'number' && h.rating > 0) as (UserAlbumHistoryEntry & {
+  return history.filter(
+    (h) => typeof h.rating === "number" && h.rating > 0,
+  ) as (UserAlbumHistoryEntry & {
     rating: number;
   })[];
 }
@@ -42,43 +46,106 @@ function frequencyMap<T>(items: T[]): Map<T, number> {
   return map;
 }
 
-function topN<T>(map: Map<T, number>, n: number): { value: T; count: number }[] {
+function topN<T>(
+  map: Map<T, number>,
+  n: number,
+): { value: T; count: number }[] {
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, n)
     .map(([value, count]) => ({ value, count }));
 }
 
-function computeRatingTendencies(rated: (UserAlbumHistoryEntry & { rating: number })[]) {
-  if (rated.length === 0) return { meanRating: null, standardDeviation: null, label: null };
-  const mean = Math.round((rated.reduce((s, h) => s + h.rating, 0) / rated.length) * 100) / 100;
+function ratingAffinityMap(
+  entries: { genres: string[]; rating: number }[],
+  keyFn: (entry: { genres: string[]; rating: number }) => string[],
+): { value: string; averageRating: number; albumCount: number }[] {
+  const map = new Map<string, { sum: number; count: number }>();
+  for (const entry of entries) {
+    for (const key of keyFn(entry)) {
+      const existing = map.get(key) ?? { sum: 0, count: 0 };
+      map.set(key, {
+        sum: existing.sum + entry.rating,
+        count: existing.count + 1,
+      });
+    }
+  }
+  return [...map.entries()]
+    .map(([value, { sum, count }]) => ({
+      value,
+      averageRating: Math.round((sum / count) * 100) / 100,
+      albumCount: count,
+    }))
+    .sort((a, b) => b.averageRating - a.averageRating);
+}
+
+function requireParam(
+  value: string | undefined | null,
+  paramName: string,
+):
+  | string
+  | { error: true; response: { content: { type: string; text: string }[] } } {
+  if (!value || value.trim() === "") {
+    const formatHint =
+      paramName === "groupSlug"
+        ? " The group slug is the group name in lowercase with hyphens instead of spaces — find it in the group page URL."
+        : paramName === "projectIdentifier"
+          ? " It can be the project name or the sharerId."
+          : "";
+
+    return {
+      error: true,
+      response: {
+        content: [
+          {
+            type: "text",
+            text: `Error: "${paramName}" is required and cannot be empty. Please provide a valid ${paramName} and try again.${formatHint}`,
+          },
+        ],
+      },
+    };
+  }
+  return value.trim();
+}
+
+function computeRatingTendencies(
+  rated: (UserAlbumHistoryEntry & { rating: number })[],
+) {
+  if (rated.length === 0)
+    return { meanRating: null, standardDeviation: null, label: null };
+  const mean =
+    Math.round((rated.reduce((s, h) => s + h.rating, 0) / rated.length) * 100) /
+    100;
   const std =
     rated.length > 1
       ? Math.round(
-          Math.sqrt(rated.reduce((s, h) => s + Math.pow(h.rating - mean, 2), 0) / rated.length) * 100
+          Math.sqrt(
+            rated.reduce((s, h) => s + Math.pow(h.rating - mean, 2), 0) /
+              rated.length,
+          ) * 100,
         ) / 100
       : null;
   const label =
     mean >= 4.0 && std !== null && std < 0.8
-      ? 'generous and consistent rater'
+      ? "generous and consistent rater"
       : mean >= 4.0
-      ? 'generous rater'
-      : mean <= 2.5 && std !== null && std < 0.8
-      ? 'harsh and consistent rater'
-      : mean <= 2.5
-      ? 'harsh rater'
-      : std !== null && std > 1.2
-      ? 'erratic rater (wide spread of ratings)'
-      : std !== null && std < 0.6
-      ? 'very consistent rater'
-      : 'average rater';
+        ? "generous rater"
+        : mean <= 2.5 && std !== null && std < 0.8
+          ? "harsh and consistent rater"
+          : mean <= 2.5
+            ? "harsh rater"
+            : std !== null && std > 1.2
+              ? "erratic rater (wide spread of ratings)"
+              : std !== null && std < 0.6
+                ? "very consistent rater"
+                : "average rater";
   return { meanRating: mean, standardDeviation: std, label };
 }
 
 function createMcpServer() {
   const server = new McpServer({
-    name: '1001-albums-generator',
-    version: '1.0.0',
+    name: "1001-albums-generator",
+    version: "1.0.0",
   });
 
   const registerTool = <T extends z.ZodRawShape>(
@@ -86,7 +153,7 @@ function createMcpServer() {
     description: string,
     schema: T,
     handler: (args: any) => Promise<any>,
-    readOnlyHint: boolean = false
+    readOnlyHint: boolean = false,
   ) => {
     const callback = (async (args: any) => {
       console.error(`[Tool Call] ${name}`, JSON.stringify(args));
@@ -108,7 +175,7 @@ function createMcpServer() {
   };
 
   registerTool(
-    'list_book_album_stats',
+    "list_book_album_stats",
     'Returns community voting statistics for all albums from the canonical "1001 Albums You Must Hear Before You Die" book list. Each entry includes: name, artist, release year, genres, total votes, average rating, controversial score, and vote distribution by grade (1–5). Use this to answer questions about the book list — e.g. "what is the highest rated book album?" or "find book albums in the jazz genre". For albums submitted by users outside the book list, use list_user_submitted_album_stats. Data is cached for 4 hours.',
     {},
     async () => {
@@ -124,14 +191,14 @@ function createMcpServer() {
         votesByGrade: s.votesByGrade,
       }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_group',
+    "get_group",
     `Returns a summary of a 1001 Albums Generator group. Use this as the entry point for any group-related conversation — it gives you the group's name, full member list (with their project identifiers), current album, all-time highest rated album, and all-time lowest rated album.
 
 The member list is particularly important: the projectIdentifier for each member is what you pass to get_project_stats, list_project_history, get_taste_profile, get_rating_outliers, and get_group_member_comparison to analyse individual members.
@@ -140,60 +207,84 @@ The allTimeHighscore and allTimeLowscore include the album and all member votes 
 
 Does not include the latest album with votes — use get_group_latest_album for that. The groupSlug is the group name in lowercase with hyphens instead of spaces (find it in the group page URL). Data is cached for 4 hours.`,
     {
-      groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
+      groupSlug: z
+        .string()
+        .describe(
+          "The group slug (lowercase, hyphenated) from the group page URL",
+        ),
     },
     async ({ groupSlug }) => {
-      const group = await client.getGroup(groupSlug);
+      const gs = requireParam(groupSlug, "groupSlug");
+      if (typeof gs === "object" && "error" in gs) return gs.response;
+      const group = await client.getGroup(gs);
       // Strip latestAlbumWithVotes — that belongs to get_group_latest_album
       const { latestAlbumWithVotes, ...summary } = group;
       return {
-        content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_group_latest_album',
+    "get_group_latest_album",
     `Returns the most recently assigned group album along with every member's rating for it. Use this to discuss how the group responded to their latest shared listening experience — who rated it highest, who was coldest on it, and how the group average compares to the community rating.
 
 This is the right starting point for "what did everyone think of the last album?" conversations. For the all-time most divisive albums across the group's full history, use get_group_album_insights instead.
 
 The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.`,
     {
-      groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
+      groupSlug: z
+        .string()
+        .describe(
+          "The group slug (lowercase, hyphenated) from the group page URL",
+        ),
     },
     async ({ groupSlug }) => {
-      const group = await client.getGroup(groupSlug);
+      const gs = requireParam(groupSlug, "groupSlug");
+      if (typeof gs === "object" && "error" in gs) return gs.response;
+      const group = await client.getGroup(gs);
       return {
         content: [
           {
-            type: 'text',
+            type: "text",
             text: JSON.stringify(group.latestAlbumWithVotes ?? null, null, 2),
           },
         ],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_group_album_reviews',
-    'Returns all member reviews and ratings for a specific album within a group. Accepts either the album UUID or album name as the albumIdentifier — if a name is given, it is resolved to a UUID via the global book stats. For best results, prefer passing the UUID directly (available from get_group or get_group_latest_album). The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.',
+    "get_group_album_reviews",
+    "Returns all member reviews and ratings for a specific album within a group. Accepts either the album UUID or album name as the albumIdentifier — if a name is given, it is resolved to a UUID via the global book stats. For best results, prefer passing the UUID directly (available from get_group or get_group_latest_album). The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.",
     {
-      groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
-      albumIdentifier: z.string().describe('The album UUID, or album name to resolve against the book list'),
+      groupSlug: z
+        .string()
+        .describe(
+          "The group slug (lowercase, hyphenated) from the group page URL",
+        ),
+      albumIdentifier: z
+        .string()
+        .describe(
+          "The album UUID, or album name to resolve against the book list",
+        ),
     },
     async ({ groupSlug, albumIdentifier }) => {
+      const gs = requireParam(groupSlug, "groupSlug");
+      if (typeof gs === "object" && "error" in gs) return gs.response;
+      const aid = requireParam(albumIdentifier, "albumIdentifier");
+      if (typeof aid === "object" && "error" in aid) return aid.response;
       // Determine if albumIdentifier looks like a UUID (MongoDB ObjectIDs)
       const uuidRegex = /^[0-9a-f]{24}$/i;
-      let albumUuid = albumIdentifier;
+      let albumUuid = aid;
 
-      if (!uuidRegex.test(albumIdentifier)) {
+      if (!uuidRegex.test(aid)) {
         // Attempt name resolution via global book stats
-        // Global stats albums do not carry UUIDs — we need to find the UUID from the group data
+        // Global stats albums do not carry UUIDs  we need to find the UUID from the group data
         // Best-effort: search the group's highscore, lowscore, currentAlbum, and latestAlbumWithVotes
-        const group = await client.getGroup(groupSlug);
+        const group = await client.getGroup(gs);
         const candidates = [
           group.currentAlbum,
           group.allTimeHighscore?.album,
@@ -201,17 +292,17 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
           group.latestAlbumWithVotes?.album,
         ].filter((a): a is NonNullable<typeof a> => a != null);
 
-        const lowerIdentifier = albumIdentifier.toLowerCase();
+        const lowerIdentifier = aid.toLowerCase();
         const match = candidates.find(
-          (a) => a.name.toLowerCase() === lowerIdentifier
+          (a) => a.name.toLowerCase() === lowerIdentifier,
         );
 
         if (!match) {
           return {
             content: [
               {
-                type: 'text',
-                text: `Could not resolve album name "${albumIdentifier}" to a UUID. Try passing the UUID directly instead.`,
+                type: "text",
+                text: `Could not resolve album name "${aid}" to a UUID. Try passing the UUID directly instead.`,
               },
             ],
           };
@@ -219,27 +310,29 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
         albumUuid = match.uuid;
       }
 
-      const reviews = await client.getGroupAlbumReviews(groupSlug, albumUuid);
+      const reviews = await client.getGroupAlbumReviews(gs, albumUuid);
       return {
-        content: [{ type: 'text', text: JSON.stringify(reviews, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(reviews, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_book_album_stat',
-    'Search the canonical book list by album name or artist. Returns matching entries with community voting stats (votes, average rating, controversial score, vote breakdown). Only searches the ~1001 albums from the original book — for user-submitted albums outside the book list, use list_user_submitted_album_stats. Data is cached for 4 hours.',
+    "get_book_album_stat",
+    "Search the canonical book list by album name or artist. Returns matching entries with community voting stats (votes, average rating, controversial score, vote breakdown). Only searches the ~1001 albums from the original book — for user-submitted albums outside the book list, use list_user_submitted_album_stats. Data is cached for 4 hours.",
     {
-      query: z.string().describe('Search query for album name or artist'),
+      query: z.string().describe("Search query for album name or artist"),
     },
     async ({ query }) => {
+      const q = requireParam(query, "query");
+      if (typeof q === "object" && "error" in q) return q.response;
       const allStats = await client.getGlobalStats();
-      const lowerQuery = query.toLowerCase();
+      const lowerQuery = q.toLowerCase();
       const filtered = allStats.albums.filter(
         (s) =>
           s.name.toLowerCase().includes(lowerQuery) ||
-          s.artist.toLowerCase().includes(lowerQuery)
+          s.artist.toLowerCase().includes(lowerQuery),
       );
       const slim = filtered.map((s) => ({
         name: s.name,
@@ -252,47 +345,55 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
         votesByGrade: s.votesByGrade,
       }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_album_of_the_day',
-    'Returns the current album assigned to a project for today, including full album metadata and any notes added by the project owner. This is the album the user is currently listening to and has not yet rated. Requires a projectIdentifier. Data is cached for 4 hours.',
+    "get_album_of_the_day",
+    "Returns the current album assigned to a project for today, including full album metadata and any notes added by the project owner. This is the album the user is currently listening to and has not yet rated. Requires a projectIdentifier. Data is cached for 4 hours.",
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
     },
     async ({ projectIdentifier }) => {
-      const project = await client.getProject(projectIdentifier);
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const project = await client.getProject(pid);
       return {
         content: [
           {
-            type: 'text',
+            type: "text",
             text: JSON.stringify(
               {
                 currentAlbum: project.currentAlbum,
                 currentAlbumNotes: project.currentAlbumNotes,
               },
               null,
-              2
+              2,
             ),
           },
         ],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_project_stats',
+    "get_project_stats",
     'Returns summary statistics for a specific project: total albums generated, number rated, number unrated, current album of the day (with full detail), update frequency, and group membership. Use this when asked about a user\'s progress — e.g. "how many albums has the user rated?" or "what is the user\'s current album?". For the full rated/unrated history, use list_project_history. Requires a projectIdentifier (project name or sharerId). Data is cached for 4 hours.',
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
     },
     async ({ projectIdentifier }) => {
-      const project = await client.getProject(projectIdentifier);
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const project = await client.getProject(pid);
       // Remove history to keep summary small
       const { history, ...summary } = project;
       const stats = calculateProjectStats(history);
@@ -302,7 +403,7 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
       return {
         content: [
           {
-            type: 'text',
+            type: "text",
             text: JSON.stringify(
               {
                 ...summary,
@@ -310,23 +411,27 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
                 ...stats,
               },
               null,
-              2
+              2,
             ),
           },
         ],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'list_project_history',
+    "list_project_history",
     "Returns the full generated history for a project. Each entry includes: generatedAlbumId, album name, artist, release year, genres, the user's rating (1–5, or null if unrated), global community rating, and date generated. Reviews and full album detail (streaming IDs, images, Wikipedia, subgenres) are intentionally omitted to keep the response manageable — use get_album_detail to retrieve complete information for a specific album. Use this to browse, filter, or analyse the user's listening history. Requires a projectIdentifier. Data is cached for 4 hours.",
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
     },
     async ({ projectIdentifier }) => {
-      const project = await client.getProject(projectIdentifier);
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const project = await client.getProject(pid);
       const slim = project.history.map((h) => ({
         generatedAlbumId: h.generatedAlbumId,
         name: h.album.name,
@@ -338,15 +443,15 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
         generatedAt: h.generatedAt,
       }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'list_user_submitted_album_stats',
-    'Returns community voting statistics for albums that users have submitted to 1001 Albums Generator projects which are NOT in the original book list. Each entry includes: name, artist, release year, genres, votes, average rating, controversial score, and vote breakdown. Contains no data specific to any individual project — for a project\'s own history and ratings, use get_project_stats or list_project_history instead. Data is cached for 4 hours.',
+    "list_user_submitted_album_stats",
+    "Returns community voting statistics for albums that users have submitted to 1001 Albums Generator projects which are NOT in the original book list. Each entry includes: name, artist, release year, genres, votes, average rating, controversial score, and vote breakdown. Contains no data specific to any individual project — for a project's own history and ratings, use get_project_stats or list_project_history instead. Data is cached for 4 hours.",
     {},
     async () => {
       const stats = await client.getUserAlbumStats();
@@ -361,22 +466,30 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
         votesByGrade: a.votesByGrade,
       }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_album_detail',
-    'Returns complete information for a single album from a project\'s history. Includes full album metadata (name, artist, release year, genres, styles, subgenres, Wikipedia URL, all streaming IDs: Spotify, Apple Music, Tidal, Amazon Music, YouTube Music, Qobuz, Deezer), the user\'s rating and full written review, global community rating, reveal status, and date generated. Use this when you need to read a review, find a streaming link, or prepare a detailed presentation for a specific album. Identify the album using its name, UUID, or generatedAlbumId (available from list_project_history or search_project_history). Requires a projectIdentifier. Data is cached for 4 hours.',
+    "get_album_detail",
+    "Returns complete information for a single album from a project's history. Includes full album metadata (name, artist, release year, genres, styles, subgenres, Wikipedia URL, all streaming IDs: Spotify, Apple Music, Tidal, Amazon Music, YouTube Music, Qobuz, Deezer), the user's rating and full written review, global community rating, reveal status, and date generated. Use this when you need to read a review, find a streaming link, or prepare a detailed presentation for a specific album. Identify the album using its name, UUID, or generatedAlbumId (available from list_project_history or search_project_history). Requires a projectIdentifier. Data is cached for 4 hours.",
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
-      albumIdentifier: z.string().describe('The name, UUID, or generatedAlbumId of the album'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
+      albumIdentifier: z
+        .string()
+        .describe("The name, UUID, or generatedAlbumId of the album"),
     },
     async ({ projectIdentifier, albumIdentifier }) => {
-      const project = await client.getProject(projectIdentifier);
-      const lowerId = albumIdentifier.toLowerCase();
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const aid = requireParam(albumIdentifier, "albumIdentifier");
+      if (typeof aid === "object" && "error" in aid) return aid.response;
+      const project = await client.getProject(pid);
+      const lowerId = aid.toLowerCase();
       const result = project.history.find((h) => {
         return (
           h.album.name.toLowerCase() === lowerId ||
@@ -385,14 +498,16 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
         );
       });
       return {
-        content: [{ type: 'text', text: JSON.stringify(result || null, null, 2) }],
+        content: [
+          { type: "text", text: JSON.stringify(result || null, null, 2) },
+        ],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_taste_profile',
+    "get_taste_profile",
     `Analyses a project's full listening history and returns a structured taste profile for the user. Use this as a starting point for any conversation about a user's music taste, listening patterns, or identity as a listener. It is intentionally broad — use it to orient yourself before reaching for more specific tools.
 
 The profile includes:
@@ -411,49 +526,76 @@ The profile includes:
 
 Requires a projectIdentifier. For deeper analysis of a specific album, use get_album_context. For albums where the user most diverges from community, use get_rating_outliers. Data is cached for 4 hours.`,
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
     },
     async ({ projectIdentifier }) => {
-      const project = await client.getProject(projectIdentifier);
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const project = await client.getProject(pid);
       const history = project.history;
       const rated = getRatedEntries(history);
 
-      // Decade distribution
-      const decadeCounts = frequencyMap(
-        history.map((h) => getDecade(getYear(h.album.releaseDate))).filter(Boolean)
-      );
-      const decadeDistribution = topN(decadeCounts, 10);
+      // Only use rated entries for affinity — unrated albums carry no preference signal
+      const ratedForAffinity = rated.map((h) => ({
+        genres: h.album.genres,
+        styles: h.album.styles ?? [],
+        decade: getDecade(getYear(h.album.releaseDate)),
+        rating: h.rating,
+      }));
 
-      // Top genres and styles
-      const genreCounts = frequencyMap(history.flatMap((h) => h.album.genres));
-      const styleCounts = frequencyMap(history.flatMap((h) => h.album.styles ?? []));
-      const topGenres = topN(genreCounts, 10);
-      const topStyles = topN(styleCounts, 10);
+      const topGenres = ratingAffinityMap(
+        ratedForAffinity,
+        (e) => e.genres,
+      ).slice(0, 10);
 
-      // Top artists (only those appearing more than once)
-      const artistCounts = frequencyMap(history.map((h) => h.album.artist));
-      const topArtists = topN(artistCounts, 10).filter((a) => a.count > 1);
+      const topStyles = ratingAffinityMap(
+        ratedForAffinity.map((e) => ({ genres: e.styles, rating: e.rating })),
+        (e) => e.genres,
+      ).slice(0, 10);
+
+      const decadeDistribution = ratingAffinityMap(
+        ratedForAffinity.map((e) => ({ genres: [e.decade], rating: e.rating })),
+        (e) => e.genres,
+      ).slice(0, 10);
+
+      // Top artists by average rating (only those appearing more than once)
+      const topArtists = ratingAffinityMap(
+        rated.map((h) => ({ genres: [h.album.artist], rating: h.rating })),
+        (e) => e.genres,
+      )
+        .filter((a) => a.albumCount > 1)
+        .slice(0, 10);
 
       // Rating tendencies
       const tendencies = computeRatingTendencies(rated);
 
       // Community alignment
-      const ratedWithGlobal = rated.filter((h) => typeof h.globalRating === 'number');
+      const ratedWithGlobal = rated.filter(
+        (h) => typeof h.globalRating === "number",
+      );
       const meanDivergence =
         ratedWithGlobal.length > 0
           ? Math.round(
-              (ratedWithGlobal.reduce((s, h) => s + (h.rating - (h.globalRating as number)), 0) /
+              (ratedWithGlobal.reduce(
+                (s, h) => s + (h.rating - (h.globalRating as number)),
+                0,
+              ) /
                 ratedWithGlobal.length) *
-                100
+                100,
             ) / 100
           : null;
 
       const meanAbsoluteDivergence =
         ratedWithGlobal.length > 0
           ? Math.round(
-              (ratedWithGlobal.reduce((s, h) => s + Math.abs(h.rating - (h.globalRating as number)), 0) /
+              (ratedWithGlobal.reduce(
+                (s, h) => s + Math.abs(h.rating - (h.globalRating as number)),
+                0,
+              ) /
                 ratedWithGlobal.length) *
-                100
+                100,
             ) / 100
           : null;
 
@@ -461,10 +603,10 @@ Requires a projectIdentifier. For deeper analysis of a specific album, use get_a
         meanAbsoluteDivergence === null
           ? null
           : meanAbsoluteDivergence < 0.5
-          ? 'consensus listener — ratings closely match the community'
-          : meanAbsoluteDivergence < 1.0
-          ? 'mild contrarian — some divergence from community norms'
-          : 'strong contrarian — frequently disagrees with the community';
+            ? "consensus listener — ratings closely match the community"
+            : meanAbsoluteDivergence < 1.0
+              ? "mild contrarian — some divergence from community norms"
+              : "strong contrarian — frequently disagrees with the community";
 
       // Completion
       const albumsGenerated = history.length;
@@ -475,7 +617,9 @@ Requires a projectIdentifier. For deeper analysis of a specific album, use get_a
           albumsGenerated,
           albumsRated,
           albumsUnrated: albumsGenerated - albumsRated,
-          completionPercentage: Math.round((albumsRated / albumsGenerated) * 100),
+          completionPercentage: Math.round(
+            (albumsRated / albumsGenerated) * 100,
+          ),
         },
         decadeDistribution,
         topGenres,
@@ -490,14 +634,14 @@ Requires a projectIdentifier. For deeper analysis of a specific album, use get_a
       };
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(profile, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(profile, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_rating_outliers',
+    "get_rating_outliers",
     `Returns albums where the user's rating diverges most from the global community average — in either direction. Use this to power conversations about what makes a user's taste unique, surprising, or contrarian.
 
 Two lists are returned:
@@ -513,14 +657,29 @@ Parameters:
 
 Combine with get_taste_profile to contextualise whether this user is generally contrarian (high mean absolute divergence) or whether these outliers are exceptional even for them. For a specific album's divergence in context, use get_album_context. Data is cached for 4 hours.`,
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
-      limit: z.number().int().min(1).max(25).default(10).describe('Number of outliers to return per direction (default 10)'),
-      direction: z.enum(['both', 'underrated', 'overrated']).default('both').describe('"underrated" = user rated lower than community, "overrated" = user rated higher, "both" = return both lists'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(25)
+        .default(10)
+        .describe("Number of outliers to return per direction (default 10)"),
+      direction: z
+        .enum(["both", "underrated", "overrated"])
+        .default("both")
+        .describe(
+          '"underrated" = user rated lower than community, "overrated" = user rated higher, "both" = return both lists',
+        ),
     },
     async ({ projectIdentifier, limit, direction }) => {
-      const project = await client.getProject(projectIdentifier);
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const project = await client.getProject(pid);
       const ratedWithGlobal = getRatedEntries(project.history).filter(
-        (h) => typeof h.globalRating === 'number'
+        (h) => typeof h.globalRating === "number",
       );
 
       const withDivergence = ratedWithGlobal.map((h) => ({
@@ -531,7 +690,8 @@ Combine with get_taste_profile to contextualise whether this user is generally c
         genres: h.album.genres,
         userRating: h.rating,
         globalRating: h.globalRating as number,
-        divergence: Math.round((h.rating - (h.globalRating as number)) * 100) / 100,
+        divergence:
+          Math.round((h.rating - (h.globalRating as number)) * 100) / 100,
       }));
 
       const result: {
@@ -539,14 +699,14 @@ Combine with get_taste_profile to contextualise whether this user is generally c
         overrated?: typeof withDivergence;
       } = {};
 
-      if (direction === 'both' || direction === 'underrated') {
+      if (direction === "both" || direction === "underrated") {
         result.underrated = withDivergence
           .filter((a) => a.divergence < 0)
           .sort((a, b) => a.divergence - b.divergence)
           .slice(0, limit);
       }
 
-      if (direction === 'both' || direction === 'overrated') {
+      if (direction === "both" || direction === "overrated") {
         result.overrated = withDivergence
           .filter((a) => a.divergence > 0)
           .sort((a, b) => b.divergence - a.divergence)
@@ -554,14 +714,14 @@ Combine with get_taste_profile to contextualise whether this user is generally c
       }
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_group_album_insights',
+    "get_group_album_insights",
     `Analyses rating patterns across all members of a group to surface the albums that generated the most disagreement and the most consensus. Requires a groupSlug.
 
 Two lists are returned:
@@ -578,15 +738,27 @@ Note: Only albums where at least 2 members have submitted a numeric rating are i
 
 Use alongside get_group_member_comparison to understand not just which albums divided the group but which specific members drove the disagreement. Data is cached for 4 hours.`,
     {
-      groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
-      limit: z.number().int().min(1).max(25).default(10).describe('Number of albums to return per category (default 10)'),
+      groupSlug: z
+        .string()
+        .describe(
+          "The group slug (lowercase, hyphenated) from the group page URL",
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(25)
+        .default(10)
+        .describe("Number of albums to return per category (default 10)"),
     },
     async ({ groupSlug, limit }) => {
-      const group = await client.getGroup(groupSlug);
+      const gs = requireParam(groupSlug, "groupSlug");
+      if (typeof gs === "object" && "error" in gs) return gs.response;
+      const group = await client.getGroup(gs);
 
       // Fetch all member projects
       const memberProjects = await Promise.all(
-        group.members.map((m) => client.getProject(m.projectIdentifier))
+        group.members.map((m) => client.getProject(m.projectIdentifier)),
       );
 
       // Build a map: albumUuid -> { name, artist, releaseDate, ratings: { member, rating }[] }
@@ -612,7 +784,9 @@ Use alongside get_group_member_comparison to understand not just which albums di
               ratings: [],
             });
           }
-          albumRatingsMap.get(uuid)!.ratings.push({ member: memberName, rating: h.rating });
+          albumRatingsMap
+            .get(uuid)!
+            .ratings.push({ member: memberName, rating: h.rating });
         });
       });
 
@@ -621,32 +795,41 @@ Use alongside get_group_member_comparison to understand not just which albums di
         .filter((a) => a.ratings.length >= 2)
         .map((a) => {
           const mean =
-            Math.round((a.ratings.reduce((s, r) => s + r.rating, 0) / a.ratings.length) * 100) / 100;
+            Math.round(
+              (a.ratings.reduce((s, r) => s + r.rating, 0) / a.ratings.length) *
+                100,
+            ) / 100;
           const variance =
             Math.round(
-              (a.ratings.reduce((s, r) => s + Math.pow(r.rating - mean, 2), 0) / a.ratings.length) * 100
+              (a.ratings.reduce((s, r) => s + Math.pow(r.rating - mean, 2), 0) /
+                a.ratings.length) *
+                100,
             ) / 100;
           return { ...a, mean, variance };
         });
 
-      const mostDivisive = [...albumStats].sort((a, b) => b.variance - a.variance).slice(0, limit);
+      const mostDivisive = [...albumStats]
+        .sort((a, b) => b.variance - a.variance)
+        .slice(0, limit);
 
-      const mostConsensus = [...albumStats].sort((a, b) => a.variance - b.variance).slice(0, limit);
+      const mostConsensus = [...albumStats]
+        .sort((a, b) => a.variance - b.variance)
+        .slice(0, limit);
 
       return {
         content: [
           {
-            type: 'text',
+            type: "text",
             text: JSON.stringify({ mostDivisive, mostConsensus }, null, 2),
           },
         ],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_group_member_comparison',
+    "get_group_member_comparison",
     `Compares the listening histories and rating patterns of two group members, given their project identifiers. Use this to answer questions like "do me and [member] have similar taste?", "which albums did we rate most differently?", and "who in the group do I agree with most?".
 
 The comparison includes:
@@ -669,13 +852,21 @@ Note: Members do not need to be in the same group — any two project identifier
 
 Use get_group_album_insights first to identify which albums divided the group most, then use this tool to drill into which specific members drove that division. Data is cached for 4 hours.`,
     {
-      projectIdentifierA: z.string().describe('Project identifier for the first member'),
-      projectIdentifierB: z.string().describe('Project identifier for the second member'),
+      projectIdentifierA: z
+        .string()
+        .describe("Project identifier for the first member"),
+      projectIdentifierB: z
+        .string()
+        .describe("Project identifier for the second member"),
     },
     async ({ projectIdentifierA, projectIdentifierB }) => {
+      const pidA = requireParam(projectIdentifierA, "projectIdentifierA");
+      if (typeof pidA === "object" && "error" in pidA) return pidA.response;
+      const pidB = requireParam(projectIdentifierB, "projectIdentifierB");
+      if (typeof pidB === "object" && "error" in pidB) return pidB.response;
       const [projectA, projectB] = await Promise.all([
-        client.getProject(projectIdentifierA),
-        client.getProject(projectIdentifierB),
+        client.getProject(pidA),
+        client.getProject(pidB),
       ]);
 
       const ratedA = getRatedEntries(projectA.history);
@@ -702,17 +893,22 @@ Use get_group_album_insights first to identify which albums divided the group mo
         };
       });
 
-      sharedAlbums.sort((a, b) => Math.abs(b.divergence) - Math.abs(a.divergence));
+      sharedAlbums.sort(
+        (a, b) => Math.abs(b.divergence) - Math.abs(a.divergence),
+      );
 
       // Taste similarity score (0–100)
       const meanAbsDivergence =
         sharedAlbums.length > 0
-          ? sharedAlbums.reduce((s, a) => s + Math.abs(a.divergence), 0) / sharedAlbums.length
+          ? sharedAlbums.reduce((s, a) => s + Math.abs(a.divergence), 0) /
+            sharedAlbums.length
           : null;
 
       // Max possible divergence on a 1–5 scale is 4
       const similarityScore =
-        meanAbsDivergence !== null ? Math.round(((4 - meanAbsDivergence) / 4) * 100) : null;
+        meanAbsDivergence !== null
+          ? Math.round(((4 - meanAbsDivergence) / 4) * 100)
+          : null;
 
       // Who rates higher overall
       const tendenciesA = computeRatingTendencies(ratedA);
@@ -725,8 +921,8 @@ Use get_group_album_insights first to identify which albums divided the group mo
           ? meanA > meanB
             ? projectIdentifierA
             : meanB > meanA
-            ? projectIdentifierB
-            : 'equal'
+              ? projectIdentifierB
+              : "equal"
           : null;
 
       // Genre overlap
@@ -734,7 +930,11 @@ Use get_group_album_insights first to identify which albums divided the group mo
       const genresB = frequencyMap(ratedB.flatMap((h) => h.album.genres));
       const sharedGenres = [...genresA.keys()]
         .filter((g) => genresB.has(g))
-        .map((g) => ({ genre: g, countA: genresA.get(g)!, countB: genresB.get(g)! }))
+        .map((g) => ({
+          genre: g,
+          countA: genresA.get(g)!,
+          countB: genresB.get(g)!,
+        }))
         .sort((a, b) => b.countA + b.countB - (a.countA + a.countB))
         .slice(0, 10);
 
@@ -748,21 +948,23 @@ Use get_group_album_insights first to identify which albums divided the group mo
           higherRater,
           tasteSimilarityScore: similarityScore,
           meanAbsoluteDivergence:
-            meanAbsDivergence !== null ? Math.round(meanAbsDivergence * 100) / 100 : null,
+            meanAbsDivergence !== null
+              ? Math.round(meanAbsDivergence * 100) / 100
+              : null,
         },
         genreOverlap: sharedGenres,
         sharedAlbums,
       };
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'compare_projects',
+    "compare_projects",
     `Compares two projects' listening histories at a high level — shared albums, genre affinity overlap, decade preferences, and rating tendencies. Unlike get_group_member_comparison (which focuses on rating divergence on shared albums), this tool is broader and works well even when the two projects have little overlap.
 
 Use this tool when the question is about overall taste compatibility or listening breadth rather than specific album disagreements. For detailed per-album rating divergence between two people, use get_group_member_comparison instead.
@@ -785,13 +987,21 @@ Parameters:
 
 Data is cached for 4 hours.`,
     {
-      projectIdentifierA: z.string().describe('Project identifier for the first project'),
-      projectIdentifierB: z.string().describe('Project identifier for the second project'),
+      projectIdentifierA: z
+        .string()
+        .describe("Project identifier for the first project"),
+      projectIdentifierB: z
+        .string()
+        .describe("Project identifier for the second project"),
     },
     async ({ projectIdentifierA, projectIdentifierB }) => {
+      const pidA = requireParam(projectIdentifierA, "projectIdentifierA");
+      if (typeof pidA === "object" && "error" in pidA) return pidA.response;
+      const pidB = requireParam(projectIdentifierB, "projectIdentifierB");
+      if (typeof pidB === "object" && "error" in pidB) return pidB.response;
       const [projectA, projectB] = await Promise.all([
-        client.getProject(projectIdentifierA),
-        client.getProject(projectIdentifierB),
+        client.getProject(pidA),
+        client.getProject(pidB),
       ]);
 
       const historyA = projectA.history;
@@ -806,7 +1016,9 @@ Data is cached for 4 hours.`,
       // Shared album highlights (both rated, sorted by globalRating desc)
       const mapA = new Map(ratedA.map((h) => [h.album.uuid, h]));
       const mapB = new Map(ratedB.map((h) => [h.album.uuid, h]));
-      const sharedRatedUuids = sharedUuids.filter((u) => mapA.has(u) && mapB.has(u));
+      const sharedRatedUuids = sharedUuids.filter(
+        (u) => mapA.has(u) && mapB.has(u),
+      );
       const sharedHighlights = sharedRatedUuids
         .map((uuid) => {
           const a = mapA.get(uuid)!;
@@ -822,27 +1034,45 @@ Data is cached for 4 hours.`,
         .sort((a, b) => (b.globalRating ?? 0) - (a.globalRating ?? 0))
         .slice(0, 10);
 
-      // Genre affinity
-      const topGenresA = topN(frequencyMap(historyA.flatMap((h) => h.album.genres)), 10);
-      const topGenresB = topN(frequencyMap(historyB.flatMap((h) => h.album.genres)), 10);
+      // Genre affinity (by average rating)
+      const topGenresA = ratingAffinityMap(
+        ratedA.map((h) => ({ genres: h.album.genres, rating: h.rating })),
+        (e) => e.genres,
+      ).slice(0, 10);
 
-      // Decade preferences
-      const decadesA = topN(
-        frequencyMap(historyA.map((h) => getDecade(getYear(h.album.releaseDate)))),
-        8
-      );
-      const decadesB = topN(
-        frequencyMap(historyB.map((h) => getDecade(getYear(h.album.releaseDate)))),
-        8
-      );
+      const topGenresB = ratingAffinityMap(
+        ratedB.map((h) => ({ genres: h.album.genres, rating: h.rating })),
+        (e) => e.genres,
+      ).slice(0, 10);
+
+      // Decade preferences (by average rating)
+      const decadesA = ratingAffinityMap(
+        ratedA.map((h) => ({
+          genres: [getDecade(getYear(h.album.releaseDate))],
+          rating: h.rating,
+        })),
+        (e) => e.genres,
+      ).slice(0, 8);
+
+      const decadesB = ratingAffinityMap(
+        ratedB.map((h) => ({
+          genres: [getDecade(getYear(h.album.releaseDate))],
+          rating: h.rating,
+        })),
+        (e) => e.genres,
+      ).slice(0, 8);
 
       const result = {
         overlapSummary: {
           sharedAlbumsCount: sharedUuids.length,
           totalA: historyA.length,
           totalB: historyB.length,
-          overlapPercentageA: Math.round((sharedUuids.length / historyA.length) * 100),
-          overlapPercentageB: Math.round((sharedUuids.length / historyB.length) * 100),
+          overlapPercentageA: Math.round(
+            (sharedUuids.length / historyA.length) * 100,
+          ),
+          overlapPercentageB: Math.round(
+            (sharedUuids.length / historyB.length) * 100,
+          ),
         },
         ratingTendencies: {
           projectA: computeRatingTendencies(ratedA),
@@ -860,14 +1090,14 @@ Data is cached for 4 hours.`,
       };
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'get_album_context',
+    "get_album_context",
     `Returns rich contextual data for a specific album within a project's history, across four dimensions:
 
 1. ARTIST ARC: All other albums by the same artist in the user's history, sorted chronologically by release date, with the user's rating and global rating for each. Use this to discuss an artist's career trajectory as heard by this user — e.g. "you rated their earlier work higher" or "this was their most acclaimed album but you disagreed".
@@ -880,13 +1110,22 @@ Data is cached for 4 hours.`,
 
 Identify the target album using its name, UUID, or generatedAlbumId (from list_project_history or search_project_history). Requires a projectIdentifier. Data is cached for 4 hours.`,
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
-      albumIdentifier:
-        z.string().describe('The name, UUID, or generatedAlbumId of the album to contextualize'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
+      albumIdentifier: z
+        .string()
+        .describe(
+          "The name, UUID, or generatedAlbumId of the album to contextualize",
+        ),
     },
     async ({ projectIdentifier, albumIdentifier }) => {
-      const project = await client.getProject(projectIdentifier);
-      const lowerId = albumIdentifier.toLowerCase();
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const aid = requireParam(albumIdentifier, "albumIdentifier");
+      if (typeof aid === "object" && "error" in aid) return aid.response;
+      const project = await client.getProject(pid);
+      const lowerId = aid.toLowerCase();
       const targetEntry = project.history.find((h) => {
         return (
           h.album.name.toLowerCase() === lowerId ||
@@ -899,7 +1138,7 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
         return {
           content: [
             {
-              type: 'text',
+              type: "text",
               text: `Album "${albumIdentifier}" not found in project history.`,
             },
           ],
@@ -910,7 +1149,8 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
       const history = project.history;
 
       // Community divergence for this album
-      const userRating = typeof targetEntry.rating === 'number' ? targetEntry.rating : null;
+      const userRating =
+        typeof targetEntry.rating === "number" ? targetEntry.rating : null;
       const globalRating = targetEntry.globalRating ?? null;
       const albumDivergence =
         userRating !== null && globalRating !== null
@@ -918,22 +1158,31 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
           : null;
 
       // User's mean divergence across all rated albums (as baseline)
-      const ratedWithGlobal = getRatedEntries(history).filter((h) => typeof h.globalRating === 'number');
+      const ratedWithGlobal = getRatedEntries(history).filter(
+        (h) => typeof h.globalRating === "number",
+      );
       const meanDivergence =
         ratedWithGlobal.length > 0
           ? Math.round(
               (ratedWithGlobal.reduce(
-                (sum, h) => sum + ((h.rating as number) - (h.globalRating as number)),
-                0
+                (sum, h) =>
+                  sum + ((h.rating as number) - (h.globalRating as number)),
+                0,
               ) /
                 ratedWithGlobal.length) *
-                100
+                100,
             ) / 100
           : null;
 
       const artistArc = history
-        .filter((h) => h.album.artist === targetAlbum.artist && h.album.uuid !== targetAlbum.uuid)
-        .sort((a, b) => getYear(a.album.releaseDate) - getYear(b.album.releaseDate))
+        .filter(
+          (h) =>
+            h.album.artist === targetAlbum.artist &&
+            h.album.uuid !== targetAlbum.uuid,
+        )
+        .sort(
+          (a, b) => getYear(a.album.releaseDate) - getYear(b.album.releaseDate),
+        )
         .map((h) => ({
           name: h.album.name,
           releaseDate: h.album.releaseDate,
@@ -944,8 +1193,12 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
       const musicalConnections = history
         .filter((h) => h.album.uuid !== targetAlbum.uuid)
         .map((h) => {
-          const sharedGenres = h.album.genres.filter((g) => targetAlbum.genres.includes(g));
-          const sharedStyles = (h.album.styles ?? []).filter((s) => (targetAlbum.styles ?? []).includes(s));
+          const sharedGenres = h.album.genres.filter((g) =>
+            targetAlbum.genres.includes(g),
+          );
+          const sharedStyles = (h.album.styles ?? []).filter((s) =>
+            (targetAlbum.styles ?? []).includes(s),
+          );
           return {
             name: h.album.name,
             artist: h.album.artist,
@@ -960,12 +1213,12 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
         .slice(0, 20);
 
       const sortedHistory = [...history].sort((a, b) => {
-        const aDate = a.generatedAt ?? '';
-        const bDate = b.generatedAt ?? '';
+        const aDate = a.generatedAt ?? "";
+        const bDate = b.generatedAt ?? "";
         return aDate.localeCompare(bDate);
       });
       const targetIndex = sortedHistory.findIndex(
-        (h) => h.generatedAlbumId === targetEntry.generatedAlbumId
+        (h) => h.generatedAlbumId === targetEntry.generatedAlbumId,
       );
       const journeyWindow = sortedHistory
         .slice(Math.max(0, targetIndex - 3), targetIndex + 4)
@@ -975,7 +1228,7 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
           artist: h.album.artist,
           generatedAt: h.generatedAt,
           userRating: h.rating ?? null,
-          position: sortedHistory.indexOf(h) < targetIndex ? 'before' : 'after',
+          position: sortedHistory.indexOf(h) < targetIndex ? "before" : "after",
         }));
 
       const context = {
@@ -994,10 +1247,10 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
           interpretation:
             albumDivergence !== null && meanDivergence !== null
               ? albumDivergence > meanDivergence + 0.5
-                ? 'User rated this notably higher than their usual divergence from the community'
+                ? "User rated this notably higher than their usual divergence from the community"
                 : albumDivergence < meanDivergence - 0.5
-                ? 'User rated this notably lower than their usual divergence from the community'
-                : 'User divergence on this album is consistent with their typical pattern'
+                  ? "User rated this notably lower than their usual divergence from the community"
+                  : "User divergence on this album is consistent with their typical pattern"
               : null,
         },
         artistArc,
@@ -1008,8 +1261,9 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
         sameYear: history
           .filter(
             (h) =>
-              getYear(h.album.releaseDate) === getYear(targetAlbum.releaseDate) &&
-              h.album.uuid !== targetAlbum.uuid
+              getYear(h.album.releaseDate) ===
+                getYear(targetAlbum.releaseDate) &&
+              h.album.uuid !== targetAlbum.uuid,
           )
           .map((h) => ({ name: h.album.name, artist: h.album.artist }))
           .slice(0, 50),
@@ -1030,27 +1284,37 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
       };
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(context, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(context, null, 2) }],
       };
-    }
+    },
   );
 
   registerTool(
-    'search_project_history',
-    'Searches a project\'s history by album name, artist, release year, or genre. Returns matching entries in the same slim format as list_project_history (generatedAlbumId, name, artist, year, genres, rating, globalRating, generatedAt — no reviews or streaming links). Use get_album_detail for full information on any result. Requires a projectIdentifier and a query string. Data is cached for 4 hours.',
+    "search_project_history",
+    "Searches a project's history by album name, artist, release year, or genre. Returns matching entries in the same slim format as list_project_history (generatedAlbumId, name, artist, year, genres, rating, globalRating, generatedAt — no reviews or streaming links). Use get_album_detail for full information on any result. Requires a projectIdentifier and a query string. Data is cached for 4 hours.",
     {
-      projectIdentifier: z.string().describe('The name of the project or the sharerId'),
-      query: z.string().describe('Search query for artist, name, year, or genre'),
+      projectIdentifier: z
+        .string()
+        .describe("The name of the project or the sharerId"),
+      query: z
+        .string()
+        .describe("Search query for artist, name, year, or genre"),
     },
     async ({ projectIdentifier, query }) => {
-      const project = await client.getProject(projectIdentifier);
-      const lowerQuery = query.toLowerCase();
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+      const q = requireParam(query, "query");
+      if (typeof q === "object" && "error" in q) return q.response;
+      const project = await client.getProject(pid);
+      const lowerQuery = q.toLowerCase();
       const filtered = project.history.filter((h) => {
         return (
           h.album.name.toLowerCase().includes(lowerQuery) ||
           h.album.artist.toLowerCase().includes(lowerQuery) ||
           h.album.releaseDate.includes(lowerQuery) ||
-          h.album.genres.some((g: string) => g.toLowerCase().includes(lowerQuery))
+          h.album.genres.some((g: string) =>
+            g.toLowerCase().includes(lowerQuery),
+          )
         );
       });
       const slim = filtered.map((h) => ({
@@ -1064,77 +1328,85 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
         generatedAt: h.generatedAt,
       }));
       return {
-        content: [{ type: 'text', text: JSON.stringify(slim, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };
     },
-    true
+    true,
   );
 
   registerTool(
-    'refresh_data',
+    "refresh_data",
     'Invalidates cached data. The next time the data is requested, it will be fetched fresh from the API. Use type "group" with a groupSlug or "project" with a projectIdentifier to refresh specific datasets.',
     {
-      type: z.enum(['global', 'user', 'project', 'group', 'all']).describe('Type of data to refresh'),
-      projectIdentifier: z.string().optional().describe('Required if type is "project"'),
+      type: z
+        .enum(["global", "user", "project", "group", "all"])
+        .describe("Type of data to refresh"),
+      projectIdentifier: z
+        .string()
+        .optional()
+        .describe('Required if type is "project"'),
       groupSlug: z.string().optional().describe('Required if type is "group"'),
     },
     async ({ type, projectIdentifier, groupSlug }) => {
-      if (type === 'global') {
+      if (type === "global") {
         client.invalidateGlobalStats();
-      } else if (type === 'user') {
+      } else if (type === "user") {
         client.invalidateUserStats();
-      } else if (type === 'project') {
-        if (!projectIdentifier) {
-          throw new Error('projectIdentifier is required when type is "project"');
-        }
-        client.invalidateProject(projectIdentifier);
-      } else if (type === 'group') {
-        if (!groupSlug) {
-          throw new Error('groupSlug is required when type is "group"');
-        }
-        client.invalidateGroup(groupSlug);
-      } else if (type === 'all') {
+      } else if (type === "project") {
+        const pid = requireParam(projectIdentifier ?? "", "projectIdentifier");
+        if (typeof pid === "object" && "error" in pid) return pid.response;
+        client.invalidateProject(pid);
+      } else if (type === "group") {
+        const gs = requireParam(groupSlug ?? "", "groupSlug");
+        if (typeof gs === "object" && "error" in gs) return gs.response;
+        client.invalidateGroup(gs);
+      } else if (type === "all") {
         client.clearCache();
       }
 
       return {
-        content: [{ type: 'text', text: `Successfully invalidated ${type} cache.` }],
+        content: [
+          { type: "text", text: `Successfully invalidated ${type} cache.` },
+        ],
       };
-    }
+    },
   );
 
   // MCP Prompt Templates
   // Prompt 1: todays-album
   server.prompt(
-    'todays-album',
+    "todays-album",
     "Get background and context on today's assigned album",
     {
-      projectIdentifier: z.string().describe('Your project name or sharerId'),
+      projectIdentifier: z.string().describe("Your project name or sharerId"),
     },
     (args: { projectIdentifier: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, fetch today's album for project "${args.projectIdentifier}" and give me a rich introduction to it. Cover: what makes it historically significant, its place in the artist's career, why it was included in the 1001 Albums book, and what the community thinks of it. If the album has notable connections to others in my listening history, mention those too.`,
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, fetch today's album for project "${args.projectIdentifier}" and give me a rich introduction to it. Cover: what makes it historically significant, its place in the artist's career, why it was included in the 1001 Albums book, and what the community thinks of it. If the album has notable connections to others in my listening history, mention those too.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 2: predict-my-rating
   server.prompt(
-    'predict-my-rating',
+    "predict-my-rating",
     "Predict how you'll rate today's album based on your history and past reviews",
     {
-      projectIdentifier: z.string().describe('Your project name or sharerId'),
+      projectIdentifier: z.string().describe("Your project name or sharerId"),
     },
     (args: { projectIdentifier: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${args.projectIdentifier}" and explain your reasoning.
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${args.projectIdentifier}" and explain your reasoning.
 
 To do this well, you should:
 1. Fetch today's album using get_album_of_the_day to know what it is
@@ -1144,49 +1416,53 @@ To do this well, you should:
 5. Use get_rating_outliers to understand whether I tend to agree or disagree with the community on albums like this
 
 Then give me a specific predicted rating (e.g. 3.5/5) with a confidence level and a detailed explanation of your reasoning — referencing my actual past ratings and reviews as evidence. Flag any uncertainties, e.g. if I have little history in this genre.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 3: taste-profile
   server.prompt(
-    'taste-profile',
-    'Get a full analysis of your music taste based on your listening history',
+    "taste-profile",
+    "Get a full analysis of your music taste based on your listening history",
     {
-      projectIdentifier: z.string().describe('Your project name or sharerId'),
+      projectIdentifier: z.string().describe("Your project name or sharerId"),
     },
     (args: { projectIdentifier: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, build a comprehensive profile of my music taste for project "${args.projectIdentifier}".
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, build a comprehensive profile of my music taste for project "${args.projectIdentifier}".
 
 Use get_taste_profile as the foundation, then enrich it with get_rating_outliers to identify where I diverge most from the community. I want to understand:
 - What genres, decades, and styles dominate my history
 - How I rate compared to the community — am I a generous or harsh rater, and do I tend to agree or disagree with the crowd?
 - Which albums I loved that others didn't, and which community favourites left me cold
 - What kind of listener I am overall — give me a short "listener archetype" summary at the end, like a music personality profile`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 4: album-deep-dive
   server.prompt(
-    'album-deep-dive',
-    'Get a deep contextual analysis of a specific album in your history',
+    "album-deep-dive",
+    "Get a deep contextual analysis of a specific album in your history",
     {
-      projectIdentifier: z.string().describe('Your project name or sharerId'),
-      albumName: z.string().describe('The name of the album to analyse'),
+      projectIdentifier: z.string().describe("Your project name or sharerId"),
+      albumName: z.string().describe("The name of the album to analyse"),
     },
     (args: { projectIdentifier: string; albumName: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, give me a deep dive on "${args.albumName}" from my project "${args.projectIdentifier}".
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, give me a deep dive on "${args.albumName}" from my project "${args.projectIdentifier}".
 
 Use get_album_context to explore:
 - The artist arc: how does this album fit into everything else I've heard from this artist, and how did I rate their other work?
@@ -1195,24 +1471,26 @@ Use get_album_context to explore:
 - Community divergence: did I rate this in line with the community or did I diverge significantly — and is that typical of me?
 
 Also use get_album_detail to retrieve my written review if I left one. Synthesise everything into a narrative about what this album means in the context of my listening history.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 5: rating-outliers
   server.prompt(
-    'rating-outliers',
-    'Find the albums where your taste diverges most from the community',
+    "rating-outliers",
+    "Find the albums where your taste diverges most from the community",
     {
-      projectIdentifier: z.string().describe('Your project name or sharerId'),
+      projectIdentifier: z.string().describe("Your project name or sharerId"),
     },
     (args: { projectIdentifier: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, find the albums where my ratings for project "${args.projectIdentifier}" diverge most from the global community.
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, find the albums where my ratings for project "${args.projectIdentifier}" diverge most from the global community.
 
 Use get_rating_outliers (direction "both") to get my biggest divergences in each direction, and use get_taste_profile to contextualise whether I'm generally a contrarian or whether these are exceptional cases.
 
@@ -1221,24 +1499,26 @@ Present two lists:
 2. Albums the community loves that I was cold on — my "controversial takes"
 
 For each, include the album name, artist, my rating, the community average, and the divergence. Then give me a short reflection on what these outliers reveal about my taste.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 6: genre-journey
   server.prompt(
-    'genre-journey',
-    'Explore how your genre exposure has evolved over your listening history',
+    "genre-journey",
+    "Explore how your genre exposure has evolved over your listening history",
     {
-      projectIdentifier: z.string().describe('Your project name or sharerId'),
+      projectIdentifier: z.string().describe("Your project name or sharerId"),
     },
     (args: { projectIdentifier: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, trace how my genre exposure has evolved over time for project "${args.projectIdentifier}".
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, trace how my genre exposure has evolved over time for project "${args.projectIdentifier}".
 
 Use list_project_history to get my full history in chronological order (sorted by generatedAt), then analyse how the genres shift across the timeline. I want to know:
 - Did I go through distinct phases or "eras" dominated by a particular genre?
@@ -1247,24 +1527,26 @@ Use list_project_history to get my full history in chronological order (sorted b
 - What does the progression say about the generator's sequencing?
 
 Present the journey as a narrative arc, not just a list of statistics.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 7: group-latest-album
   server.prompt(
-    'group-latest-album',
+    "group-latest-album",
     "See how your group rated their latest album and spark a discussion",
     {
-      groupSlug: z.string().describe('Your group slug from the group page URL'),
+      groupSlug: z.string().describe("Your group slug from the group page URL"),
     },
     (args: { groupSlug: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, fetch the latest album for group "${args.groupSlug}" and give me a full breakdown of how the group responded to it.
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, fetch the latest album for group "${args.groupSlug}" and give me a full breakdown of how the group responded to it.
 
 Use get_group_latest_album to get the album and all member votes. Then:
 - Summarise how the group rated it overall vs the community average
@@ -1273,24 +1555,26 @@ Use get_group_latest_album to get the album and all member votes. Then:
 - Give some background on the album itself and why opinions might vary
 
 End with a discussion prompt or question that could spark conversation in the group about this album.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 8: group-compatibility
   server.prompt(
-    'group-compatibility',
-    'Find out who in your group has the most similar and most different taste',
+    "group-compatibility",
+    "Find out who in your group has the most similar and most different taste",
     {
-      groupSlug: z.string().describe('Your group slug from the group page URL'),
+      groupSlug: z.string().describe("Your group slug from the group page URL"),
     },
     (args: { groupSlug: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, analyse the taste compatibility across all members of group "${args.groupSlug}".
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, analyse the taste compatibility across all members of group "${args.groupSlug}".
 
 Use get_group_compatibility_matrix to get the full pairwise similarity scores, then give me:
 - The most compatible pair in the group and what their shared taste looks like
@@ -1300,24 +1584,26 @@ Use get_group_compatibility_matrix to get the full pairwise similarity scores, t
 - A short personality summary for the group as a whole: are you a cohesive group or a diverse one?
 
 Make it conversational and fun — this should feel like a music compatibility report, not a spreadsheet.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 9: group-divisive-albums
   server.prompt(
-    'group-divisive-albums',
-    'Find the albums that divided your group most — and the ones you all agreed on',
+    "group-divisive-albums",
+    "Find the albums that divided your group most — and the ones you all agreed on",
     {
-      groupSlug: z.string().describe('Your group slug from the group page URL'),
+      groupSlug: z.string().describe("Your group slug from the group page URL"),
     },
     (args: { groupSlug: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${args.groupSlug}".
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${args.groupSlug}".
 
 Use get_group_album_insights to get the most divisive and most consensus albums. For the top divisive albums, use get_group_album_reviews to get the individual member reviews and ratings so you can show exactly who loved it and who didn't.
 
@@ -1326,25 +1612,31 @@ Present it in two sections:
 2. "Rare Agreements" — albums where everyone was on the same page, noting whether that was universal love or universal disappointment
 
 End with a reflection on what the pattern of disagreements reveals about the group's taste diversity.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 10: compare-members
   server.prompt(
-    'compare-members',
-    'Get a detailed taste comparison between two group members',
+    "compare-members",
+    "Get a detailed taste comparison between two group members",
     {
-      projectIdentifierA: z.string().describe("First member's project name or sharerId"),
-      projectIdentifierB: z.string().describe("Second member's project name or sharerId"),
+      projectIdentifierA: z
+        .string()
+        .describe("First member's project name or sharerId"),
+      projectIdentifierB: z
+        .string()
+        .describe("Second member's project name or sharerId"),
     },
     (args: { projectIdentifierA: string; projectIdentifierB: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, give me a detailed taste comparison between "${args.projectIdentifierA}" and "${args.projectIdentifierB}".
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, give me a detailed taste comparison between "${args.projectIdentifierA}" and "${args.projectIdentifierB}".
 
 Use get_group_member_comparison to get the full breakdown, then enrich it by fetching each member's taste profile using get_taste_profile.
 
@@ -1354,24 +1646,26 @@ Cover:
 - Where they diverge most — the albums they rated most differently, and what those disagreements reveal
 - Who is the harsher rater of the two, and whether that affects how you interpret divergences
 - A verdict: are these two musically compatible, or do they bring completely different sensibilities to the group?`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   // Prompt 11: listening-wrapped
   server.prompt(
-    'listening-wrapped',
-    'Get a Spotify Wrapped-style summary of your listening history',
+    "listening-wrapped",
+    "Get a Spotify Wrapped-style summary of your listening history",
     {
-      projectIdentifier: z.string().describe('Your project name or sharerId'),
+      projectIdentifier: z.string().describe("Your project name or sharerId"),
     },
     (args: { projectIdentifier: string }) => ({
-      messages: [{
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `Using the 1001 Albums tools, create a Spotify Wrapped-style summary of my listening history for project "${args.projectIdentifier}".
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Using the 1001 Albums tools, create a Spotify Wrapped-style summary of my listening history for project "${args.projectIdentifier}".
 
 Use get_taste_profile as the foundation and get_rating_outliers for the most surprising moments. Make it punchy, visual in feel, and fun — like an end-of-year review. Include:
 - Total albums heard and rated
@@ -1383,30 +1677,33 @@ Use get_taste_profile as the foundation and get_rating_outliers for the most sur
 - A made-up "album of my year" — the single album that best represents my listening journey
 
 Format it as a series of bold headline stats followed by short punchy commentary on each.`,
+          },
         },
-      }],
-    })
+      ],
+    }),
   );
 
   return server;
 }
 
 async function main() {
-  const mode = process.env.MCP_MODE || 'stdio';
+  const mode = process.env.MCP_MODE || "stdio";
 
-  if (mode === 'sse') {
+  if (mode === "sse") {
     const app = express();
     const port = process.env.PORT || 3000;
 
     const transports = new Map<string, StreamableHTTPServerTransport>();
 
-    app.all('/mcp', async (req, res, next) => {
+    app.all("/mcp", async (req, res, next) => {
       try {
         const sessionId = (req.query.sessionId ||
-          req.headers['mcp-session-id'] ||
-          req.headers['x-session-id']) as string | undefined;
+          req.headers["mcp-session-id"] ||
+          req.headers["x-session-id"]) as string | undefined;
 
-        console.error(`[HTTP] ${req.method} /mcp${sessionId ? ` (Session: ${sessionId})` : ''}`);
+        console.error(
+          `[HTTP] ${req.method} /mcp${sessionId ? ` (Session: ${sessionId})` : ""}`,
+        );
 
         if (sessionId) {
           const transport = transports.get(sessionId);
@@ -1414,7 +1711,7 @@ async function main() {
             await transport.handleRequest(req, res);
           } else {
             console.error(`[HTTP] Session not found: ${sessionId}`);
-            res.status(400).send('Session not found');
+            res.status(400).send("Session not found");
           }
         } else {
           const transport = new StreamableHTTPServerTransport({
@@ -1438,25 +1735,25 @@ async function main() {
           }
         }
       } catch (err) {
-        console.error('[HTTP] Request error', err);
+        console.error("[HTTP] Request error", err);
         next(err);
       }
     });
 
     app.listen(port, () => {
       console.error(
-        `1001 Albums Generator MCP Server running on Streamable HTTP at http://localhost:${port}/mcp`
+        `1001 Albums Generator MCP Server running on Streamable HTTP at http://localhost:${port}/mcp`,
       );
     });
   } else {
     const transport = new StdioServerTransport();
     const server = createMcpServer();
     await server.connect(transport);
-    console.error('1001 Albums Generator MCP Server running on stdio');
+    console.error("1001 Albums Generator MCP Server running on stdio");
   }
 }
 
 main().catch((error) => {
-  console.error('Fatal error in main():', error);
+  console.error("Fatal error in main():", error);
   process.exit(1);
 });
