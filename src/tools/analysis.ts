@@ -9,6 +9,7 @@ import {
   ratingAffinityMap,
   requireParam,
 } from "../helpers.js";
+import { slimHistoryEntry } from "../dto.js";
 import { makeRegisterTool } from "./register-tool.js";
 
 export function registerAnalysisTools(
@@ -109,13 +110,7 @@ Combine with get_taste_profile to contextualise whether this user is generally c
       const ratedWithGlobal = getRatedEntries(project.history).filter((h) => typeof h.globalRating === "number");
 
       const withDivergence = ratedWithGlobal.map((h) => ({
-        generatedAlbumId: h.generatedAlbumId,
-        name: h.album.name,
-        artist: h.album.artist,
-        releaseDate: h.album.releaseDate,
-        genres: h.album.genres,
-        userRating: h.rating,
-        globalRating: h.globalRating as number,
+        ...slimHistoryEntry(h),
         divergence: Math.round((h.rating - (h.globalRating as number)) * 100) / 100,
       }));
 

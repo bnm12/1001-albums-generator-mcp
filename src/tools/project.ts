@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { AlbumsGeneratorClient } from "../api.js";
+import { slimAlbum, slimHistoryEntry } from "../dto.js";
 import { calculateProjectStats, getRatedEntries, getYear, requireParam } from "../helpers.js";
 import { makeRegisterTool } from "./register-tool.js";
 
@@ -29,7 +30,7 @@ export function registerProjectTools(
 
   registerTool(
     "get_project_stats",
-    'Returns summary statistics for a specific project: total albums generated, number rated, number unrated, current album of the day (with full detail), update frequency, and group membership. Use this when asked about a user\'s progress — e.g. "how many albums has the user rated?" or "what is the user\'s current album?". For the full rated/unrated history, use list_project_history. Requires a projectIdentifier (project name or sharerId). Data is cached for 4 hours.',
+    'Returns summary statistics for a specific project: total albums generated, number rated, number unrated, current album of the day, update frequency, and group membership. Use this when asked about a user\'s progress — e.g. "how many albums has the user rated?" or "what is the user\'s current album?". For the full rated/unrated history, use list_project_history. Requires a projectIdentifier (project name or sharerId). Data is cached for 4 hours. The currentAlbum field returns a slim album object (name, artist, uuid, slug, releaseDate, genres) — use get_album_of_the_day for full album detail including streaming links.',
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
     },
@@ -39,12 +40,7 @@ export function registerProjectTools(
       const project = await client.getProject(pid);
       const { history, ...summary } = project;
       const stats = calculateProjectStats(history);
-      const currentAlbum = project.currentAlbum
-        ? (() => {
-            const { images, slug, ...rest } = project.currentAlbum;
-            return rest;
-          })()
-        : null;
+      const currentAlbum = project.currentAlbum ? slimAlbum(project.currentAlbum) : null;
       return {
         content: [{ type: "text", text: JSON.stringify({ ...summary, currentAlbum, ...stats }, null, 2) }],
       };
@@ -62,16 +58,7 @@ export function registerProjectTools(
       const pid = requireParam(projectIdentifier, "projectIdentifier");
       if (typeof pid === "object" && "error" in pid) return pid.response;
       const project = await client.getProject(pid);
-      const slim = project.history.map((h) => ({
-        generatedAlbumId: h.generatedAlbumId,
-        name: h.album.name,
-        artist: h.album.artist,
-        releaseDate: h.album.releaseDate,
-        genres: h.album.genres,
-        rating: h.rating ?? null,
-        globalRating: h.globalRating,
-        generatedAt: h.generatedAt,
-      }));
+      const slim = project.history.map(slimHistoryEntry);
       return { content: [{ type: "text", text: JSON.stringify(slim, null, 2) }] };
     },
     true,
@@ -144,14 +131,19 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
       const artistArc = history
         .filter((h) => h.album.artist === targetAlbum.artist && h.album.uuid !== targetAlbum.uuid)
         .sort((a, b) => getYear(a.album.releaseDate) - getYear(b.album.releaseDate))
-        .map((h) => ({ name: h.album.name, releaseDate: h.album.releaseDate, userRating: h.rating ?? null, globalRating: h.globalRating ?? null }));
+        .map((h) => ({ ...slimHistoryEntry(h) }));
 
       const musicalConnections = history
         .filter((h) => h.album.uuid !== targetAlbum.uuid)
         .map((h) => {
           const sharedGenres = h.album.genres.filter((g) => targetAlbum.genres.includes(g));
           const sharedStyles = (h.album.styles ?? []).filter((s) => (targetAlbum.styles ?? []).includes(s));
-          return { name: h.album.name, artist: h.album.artist, releaseDate: h.album.releaseDate, sharedGenres, sharedStyles, connectionStrength: sharedGenres.length + sharedStyles.length };
+          return {
+            ...slimAlbum(h.album),
+            sharedGenres,
+            sharedStyles,
+            connectionStrength: sharedGenres.length + sharedStyles.length,
+          };
         })
         .filter((h) => h.connectionStrength > 0)
         .sort((a, b) => b.connectionStrength - a.connectionStrength)
@@ -162,7 +154,10 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
       const journeyWindow = sortedHistory
         .slice(Math.max(0, targetIndex - 3), targetIndex + 4)
         .filter((h) => h.generatedAlbumId !== targetEntry.generatedAlbumId)
-        .map((h) => ({ name: h.album.name, artist: h.album.artist, generatedAt: h.generatedAt, userRating: h.rating ?? null, position: sortedHistory.indexOf(h) < targetIndex ? "before" : "after" }));
+        .map((h) => ({
+          ...slimHistoryEntry(h),
+          position: sortedHistory.indexOf(h) < targetIndex ? "before" : "after",
+        }));
 
       const context = {
         targetAlbum: { name: targetAlbum.name, artist: targetAlbum.artist, releaseDate: targetAlbum.releaseDate, genres: targetAlbum.genres, styles: targetAlbum.styles, userRating, globalRating },
@@ -184,7 +179,7 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
         sameArtist: artistArc,
         sameYear: history
           .filter((h) => getYear(h.album.releaseDate) === getYear(targetAlbum.releaseDate) && h.album.uuid !== targetAlbum.uuid)
-          .map((h) => ({ name: h.album.name, artist: h.album.artist }))
+          .map((h) => slimAlbum(h.album))
           .slice(0, 50),
         relatedByParticipatingArtists: history
           .filter((h) => {
@@ -193,7 +188,7 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
             const otherArtists = h.album.artist.split(/&|,|and|with/i).map((s) => s.trim()).filter(Boolean);
             return targetArtists.some((ta) => otherArtists.includes(ta));
           })
-          .map((h) => ({ name: h.album.name, artist: h.album.artist })),
+          .map((h) => slimAlbum(h.album)),
       };
 
       return { content: [{ type: "text", text: JSON.stringify(context, null, 2) }] };
@@ -215,7 +210,7 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
       const project = await client.getProject(pid);
       const lowerQuery = q.toLowerCase();
       const filtered = project.history.filter((h) => h.album.name.toLowerCase().includes(lowerQuery) || h.album.artist.toLowerCase().includes(lowerQuery) || h.album.releaseDate.includes(lowerQuery) || h.album.genres.some((g: string) => g.toLowerCase().includes(lowerQuery)));
-      const slim = filtered.map((h) => ({ generatedAlbumId: h.generatedAlbumId, name: h.album.name, artist: h.album.artist, releaseDate: h.album.releaseDate, genres: h.album.genres, rating: h.rating ?? null, globalRating: h.globalRating, generatedAt: h.generatedAt }));
+      const slim = filtered.map(slimHistoryEntry);
       return { content: [{ type: "text", text: JSON.stringify(slim, null, 2) }] };
     },
     true,
