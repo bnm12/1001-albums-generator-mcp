@@ -1,4 +1,4 @@
-Using the 1001 Albums tools, find the albums where my ratings for project "${args.projectIdentifier}" diverge most from the global community.
+Using the 1001 Albums tools, find the albums where my ratings for project "${projectIdentifier}" diverge most from the global community.
 
 Use get_rating_outliers (direction "both") to get my biggest divergences in each direction, and use get_taste_profile to contextualise whether I'm generally a contrarian or whether these are exceptional cases.
 

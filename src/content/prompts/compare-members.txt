@@ -1,4 +1,4 @@
-Using the 1001 Albums tools, give me a detailed taste comparison between "${args.projectIdentifierA}" and "${args.projectIdentifierB}".
+Using the 1001 Albums tools, give me a detailed taste comparison between "${projectIdentifierA}" and "${projectIdentifierB}".
 
 Use get_group_member_comparison to get the full breakdown, then enrich it by fetching each member's taste profile using get_taste_profile.
 

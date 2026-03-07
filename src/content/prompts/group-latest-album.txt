@@ -1,4 +1,4 @@
-Using the 1001 Albums tools, fetch the latest album for group "${args.groupSlug}" and give me a full breakdown of how the group responded to it.
+Using the 1001 Albums tools, fetch the latest album for group "${groupSlug}" and give me a full breakdown of how the group responded to it.
 
 Use get_group_latest_album to get the album and all member votes. Then:
 - Summarise how the group rated it overall vs the community average

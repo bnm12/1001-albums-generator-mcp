@@ -2,7 +2,7 @@ First, read the resource at info://1001-albums/tool-guide — specifically the r
 group workflow for "what divided us" — and info://1001-albums/about for context on how
 group members share album assignments.
 
-Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${args.groupSlug}".
+Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${groupSlug}".
 
 Use get_group_album_insights to get the most divisive and most consensus albums. For the top divisive albums, use get_group_album_reviews to get the individual member reviews and ratings so you can show exactly who loved it and who didn't.
 

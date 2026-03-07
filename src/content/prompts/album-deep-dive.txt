@@ -1,4 +1,4 @@
-Using the 1001 Albums tools, give me a deep dive on "${args.albumName}" from my project "${args.projectIdentifier}".
+Using the 1001 Albums tools, give me a deep dive on "${albumName}" from my project "${projectIdentifier}".
 
 Use get_album_context to explore:
 - The artist arc: how does this album fit into everything else I've heard from this artist, and how did I rate their other work?
