@@ -6,7 +6,10 @@
   "scripts": {
     "build": "tsc && cp -r src/content dist/content",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "repository": {
     "type": "git",
@@ -30,7 +33,9 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.5",
+    "@vitest/coverage-v8": "^4.0.18",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

@@ -8,16 +8,17 @@ import { registerComparisonTools } from "./tools/comparison.js";
 import { registerGroupTools } from "./tools/group.js";
 import { registerProjectTools } from "./tools/project.js";
 
-const client = new AlbumsGeneratorClient();
+const defaultClient = new AlbumsGeneratorClient();
 
-export function createMcpServer(): McpServer {
+export function createMcpServer(client?: AlbumsGeneratorClient): McpServer {
+  const resolvedClient = client ?? defaultClient;
   const server = new McpServer({ name: "1001-albums-generator", version: "1.0.0" });
 
-  registerProjectTools(server, client);
-  registerCommunityTools(server, client);
-  registerGroupTools(server, client);
-  registerAnalysisTools(server, client);
-  registerComparisonTools(server, client);
+  registerProjectTools(server, resolvedClient);
+  registerCommunityTools(server, resolvedClient);
+  registerGroupTools(server, resolvedClient);
+  registerAnalysisTools(server, resolvedClient);
+  registerComparisonTools(server, resolvedClient);
   registerPrompts(server);
   registerResources(server);
 
