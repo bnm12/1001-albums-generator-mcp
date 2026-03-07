@@ -12,7 +12,15 @@ const defaultClient = new AlbumsGeneratorClient();
 
 export function createMcpServer(client?: AlbumsGeneratorClient): McpServer {
   const resolvedClient = client ?? defaultClient;
-  const server = new McpServer({ name: "1001-albums-generator", version: "1.0.0" });
+  const server = new McpServer({
+    name: "1001-albums-generator",
+    version: "1.0.0",
+    description:
+      "MCP server for the 1001 Albums Generator challenge. Provides tools to explore " +
+      "your listening history, analyse taste from ratings and reviews, compare group " +
+      "members, and get context on today's assigned album. Before calling any tools, " +
+      "read the tool guide resource at info://1001-albums/tool-guide.",
+  });
 
   registerProjectTools(server, resolvedClient);
   registerCommunityTools(server, resolvedClient);

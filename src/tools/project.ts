@@ -261,6 +261,7 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
 
       return { content: [{ type: "text", text: JSON.stringify(context, null, 2) }] };
     },
+    true,
   );
 
   registerTool(

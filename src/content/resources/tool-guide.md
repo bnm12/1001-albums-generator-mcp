@@ -106,7 +106,7 @@ The \`projectIdentifier\` values in \`group.members\` are the inputs for member-
 | What is the group's current album and how did they rate it? | \`get_group_latest_album\` |
 | Which albums divided the group most? | \`get_group_album_insights\` |
 | Which albums did the group all agree on? | \`get_group_album_insights\` (mostConsensus) |
-| What do all members think of a specific album? | \`get_group_album_reviews\` |
+| What do all members think of a specific album? | \`get_group_album_reviews\` — pass UUID directly; name resolution only works for the group's current, latest, and all-time high/low albums |
 | Who in the group has most/least compatible taste overall? | \`get_group_compatibility_matrix\` |
 | Compare two specific members in detail | \`get_group_member_comparison\` |
 

@@ -55,7 +55,24 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
 
   registerTool(
     "get_group_album_reviews",
-    "Returns all member reviews and ratings for a specific album within a group. Accepts either the album UUID or album name as the albumIdentifier — if a name is given, it is resolved to a UUID via the global book stats. For best results, prefer passing the UUID directly (available from get_group or get_group_latest_album). The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.",
+    `Returns all member reviews and ratings for a specific album within a group.
+
+The albumIdentifier should be the album's UUID — this is the reliable, always-correct
+way to identify an album. UUIDs are available from:
+  - get_group → allTimeHighscore.album.uuid, allTimeLowscore.album.uuid,
+                currentAlbum.uuid
+  - get_group_latest_album → album.uuid
+  - list_project_history or search_project_history → album.uuid on any history entry
+  - get_album_detail → album.uuid
+
+⚠ NAME RESOLUTION IS LIMITED: If you pass an album name instead of a UUID, the tool
+will attempt to resolve it by searching only the group's currentAlbum, allTimeHighscore,
+allTimeLowscore, and latestAlbumWithVotes. Names from project history or any other
+source will fail to resolve with a "Could not resolve" error. Always prefer passing
+the UUID directly.
+
+The groupSlug is the group name in lowercase with hyphens instead of spaces (visible
+in the group page URL). Data is cached for 4 hours.`,
     {
       groupSlug: z.string().describe("The group slug (lowercase, hyphenated) from the group page URL"),
       albumIdentifier: z.string().describe("The album UUID, or album name to resolve against the book list"),
