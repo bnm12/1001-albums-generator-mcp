@@ -181,15 +181,18 @@ export class AlbumsGeneratorClient {
     const groupInfo: GroupInfo = {
       name: data.name,
       slug: data.slug,
-      members: (data.members || []).map((m: any) => ({
-        name: m.name,
-        projectIdentifier: m.name, // The API doesn't seem to provide a separate identifier, use name
-      })),
+      members: (data.members || []).map((m: any) => {
+        const name = typeof m === 'string' ? m : m.name;
+        return {
+          name: name,
+          projectIdentifier: name,
+        };
+      }),
       currentAlbum: data.currentAlbum || null,
       allTimeHighscore: data.highestRatedAlbums?.[0]
         ? {
             album: data.highestRatedAlbums[0],
-            votes: [], // Group endpoint doesn't return member-specific votes for high/low scores
+            votes: [],
           }
         : null,
       allTimeLowscore: data.lowestRatedAlbums?.[0]
@@ -201,10 +204,55 @@ export class AlbumsGeneratorClient {
       latestAlbumWithVotes: data.latestAlbum
         ? {
             album: data.latestAlbum,
-            votes: [], // To be populated if needed, or left empty if not provided by this endpoint
+            votes: [],
           }
         : null,
     };
+
+    // Populate votes for highscore, lowscore, and latest album in parallel.
+    // Note: client.throttle() will still serialize these to respect rate limits.
+    const voteFetchers: Promise<void>[] = [];
+
+    if (groupInfo.allTimeHighscore) {
+      voteFetchers.push(
+        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeHighscore.album.uuid).then((reviews) => {
+          if (groupInfo.allTimeHighscore) {
+            groupInfo.allTimeHighscore.votes = reviews.reviews.map((r) => ({
+              projectIdentifier: r.projectIdentifier,
+              rating: r.rating,
+            }));
+          }
+        })
+      );
+    }
+
+    if (groupInfo.allTimeLowscore) {
+      voteFetchers.push(
+        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeLowscore.album.uuid).then((reviews) => {
+          if (groupInfo.allTimeLowscore) {
+            groupInfo.allTimeLowscore.votes = reviews.reviews.map((r) => ({
+              projectIdentifier: r.projectIdentifier,
+              rating: r.rating,
+            }));
+          }
+        })
+      );
+    }
+
+    if (groupInfo.latestAlbumWithVotes) {
+      voteFetchers.push(
+        this.getGroupAlbumReviews(groupSlug, groupInfo.latestAlbumWithVotes.album.uuid).then((reviews) => {
+          if (groupInfo.latestAlbumWithVotes) {
+            groupInfo.latestAlbumWithVotes.votes = reviews.reviews.map((r) => ({
+              projectIdentifier: r.projectIdentifier,
+              rating: r.rating,
+            }));
+          }
+        })
+      );
+    }
+
+    await Promise.all(voteFetchers);
 
     this.groupsCache.set(groupSlug, {
       data: groupInfo,

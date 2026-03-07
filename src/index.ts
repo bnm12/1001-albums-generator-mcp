@@ -77,7 +77,13 @@ function createMcpServer() {
 
   registerTool(
     'get_group',
-    'Returns a summary of a 1001 Albums Generator group, including the group name, member list, current album, all-time highest rated album, and all-time lowest rated album. Does not include the latest album votes — use get_group_latest_album for that. The groupSlug is the group name in lowercase with hyphens instead of spaces (find it in the group page URL). Data is cached for 4 hours.',
+    `Returns a summary of a 1001 Albums Generator group. Use this as the entry point for any group-related conversation — it gives you the group's name, full member list (with their project identifiers), current album, all-time highest rated album, and all-time lowest rated album.
+
+The member list is particularly important: the projectIdentifier for each member is what you pass to get_project_stats, list_project_history, get_taste_profile, get_rating_outliers, and get_group_member_comparison to analyse individual members.
+
+The allTimeHighscore and allTimeLowscore include the album and all member votes — use these to open discussions like "your group's most beloved album of all time is..." or "this is the one album everyone agreed was bad".
+
+Does not include the latest album with votes — use get_group_latest_album for that. The groupSlug is the group name in lowercase with hyphens instead of spaces (find it in the group page URL). Data is cached for 4 hours.`,
     {
       groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
     },
@@ -94,21 +100,16 @@ function createMcpServer() {
 
   registerTool(
     'get_group_latest_album',
-    'Returns the latest album assigned to a group along with all member votes (ratings) for that album. Use this to see how group members rated their most recent shared album. The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.',
+    `Returns the most recently assigned group album along with every member's rating for it. Use this to discuss how the group responded to their latest shared listening experience — who rated it highest, who was coldest on it, and how the group average compares to the community rating.
+
+This is the right starting point for "what did everyone think of the last album?" conversations. For the all-time most divisive albums across the group's full history, use get_group_album_insights instead.
+
+The groupSlug is the group name in lowercase with hyphens instead of spaces. Data is cached for 4 hours.`,
     {
       groupSlug: z.string().describe('The group slug (lowercase, hyphenated) from the group page URL'),
     },
     async ({ groupSlug }) => {
       const group = await client.getGroup(groupSlug);
-
-      if (group.latestAlbumWithVotes) {
-        const reviews = await client.getGroupAlbumReviews(groupSlug, group.latestAlbumWithVotes.album.uuid);
-        group.latestAlbumWithVotes.votes = reviews.reviews.map(r => ({
-          projectIdentifier: r.projectIdentifier,
-          rating: r.rating
-        }));
-      }
-
       return {
         content: [
           {
@@ -135,6 +136,7 @@ function createMcpServer() {
 
       if (!uuidRegex.test(albumIdentifier)) {
         // Attempt name resolution via global book stats
+        // Global stats albums do not carry UUIDs — we need to find the UUID from the group data
         // Best-effort: search the group's highscore, lowscore, currentAlbum, and latestAlbumWithVotes
         const group = await client.getGroup(groupSlug);
         const candidates = [
