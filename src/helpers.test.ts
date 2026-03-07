@@ -11,11 +11,14 @@ import {
   getDecade,
   getRatedEntries,
   getYear,
+  paginateAndSort,
   ratingAffinityMap,
   requireParam,
+  sortHistory,
+  sortStats,
   topN,
 } from "./helpers.js";
-import { makeAlbum, makeHistoryEntry } from "./test/fixtures.js";
+import { makeAlbum, makeAlbumStat, makeHistoryEntry } from "./test/fixtures.js";
 import type { UserAlbumHistoryEntry } from "./api.js";
 
 describe("helpers", () => {
@@ -560,5 +563,118 @@ describe("formatApiError", () => {
   it("treats axios-like errors from axios constructor as axios errors", () => {
     const e = new AxiosError("Network Error");
     expect(axios.isAxiosError(e)).toBe(true);
+  });
+});
+
+
+describe("paginateAndSort", () => {
+  it("returns all items without limit and offset defaults", () => {
+    const items = Array.from({ length: 10 }, (_, i) => i);
+    const result = paginateAndSort(items, {});
+    expect(result.totalCount).toBe(10);
+    expect(result.returnedCount).toBe(10);
+    expect(result.offset).toBe(0);
+    expect(result.limit).toBeNull();
+    expect(result.results).toEqual(items);
+  });
+
+  it("applies limit", () => {
+    const result = paginateAndSort(Array.from({ length: 10 }, (_, i) => i), { limit: 3 });
+    expect(result.totalCount).toBe(10);
+    expect(result.returnedCount).toBe(3);
+    expect(result.results).toEqual([0, 1, 2]);
+  });
+
+  it("applies offset and limit", () => {
+    const result = paginateAndSort(Array.from({ length: 10 }, (_, i) => i), { offset: 5, limit: 3 });
+    expect(result.results).toEqual([5, 6, 7]);
+  });
+
+  it("returns remaining items when limit exceeds tail", () => {
+    const result = paginateAndSort(Array.from({ length: 10 }, (_, i) => i), { offset: 8, limit: 10 });
+    expect(result.returnedCount).toBe(2);
+    expect(result.totalCount).toBe(10);
+    expect(result.results).toEqual([8, 9]);
+  });
+
+  it("returns empty when offset is past end", () => {
+    const result = paginateAndSort(Array.from({ length: 10 }, (_, i) => i), { offset: 20 });
+    expect(result.returnedCount).toBe(0);
+    expect(result.totalCount).toBe(10);
+    expect(result.results).toEqual([]);
+  });
+
+  it("returns from offset onward when no limit", () => {
+    const result = paginateAndSort(Array.from({ length: 10 }, (_, i) => i), { offset: 3 });
+    expect(result.totalCount).toBe(10);
+    expect(result.limit).toBeNull();
+    expect(result.results).toEqual([3, 4, 5, 6, 7, 8, 9]);
+  });
+});
+
+describe("sortHistory", () => {
+  const entries = [
+    makeHistoryEntry({ generatedAlbumId: "1", generatedAt: "2024-01-01T00:00:00.000Z", rating: 3 }),
+    makeHistoryEntry({ generatedAlbumId: "2", generatedAt: "2024-03-01T00:00:00.000Z", rating: null }),
+    makeHistoryEntry({ generatedAlbumId: "3", generatedAt: "2024-02-01T00:00:00.000Z", rating: 5 }),
+    makeHistoryEntry({ generatedAlbumId: "4", generatedAt: "2023-12-01T00:00:00.000Z", rating: 1 }),
+  ].map((entry) => ({
+    generatedAlbumId: entry.generatedAlbumId,
+    album: makeAlbum({ name: `Album ${entry.generatedAlbumId}` }),
+    rating: typeof entry.rating === "number" ? entry.rating : null,
+    generatedAt: entry.generatedAt,
+  }));
+
+  it("sorts by recent", () => {
+    expect(sortHistory(entries, "recent").map((e) => e.generatedAlbumId)).toEqual(["2", "3", "1", "4"]);
+  });
+
+  it("sorts by oldest", () => {
+    expect(sortHistory(entries, "oldest").map((e) => e.generatedAlbumId)).toEqual(["4", "1", "3", "2"]);
+  });
+
+  it("sorts by highest_rated with unrated last", () => {
+    expect(sortHistory(entries, "highest_rated").map((e) => e.generatedAlbumId)).toEqual(["3", "1", "4", "2"]);
+  });
+
+  it("sorts by lowest_rated with unrated last", () => {
+    expect(sortHistory(entries, "lowest_rated").map((e) => e.generatedAlbumId)).toEqual(["4", "1", "3", "2"]);
+  });
+
+  it("does not mutate input", () => {
+    const original = entries.map((e) => e.generatedAlbumId);
+    sortHistory(entries, "recent");
+    expect(entries.map((e) => e.generatedAlbumId)).toEqual(original);
+  });
+});
+
+describe("sortStats", () => {
+  const stats = [
+    makeAlbumStat({ name: "A", averageRating: 3.2, votes: 100, controversialScore: 1.1 }),
+    makeAlbumStat({ name: "B", averageRating: 4.8, votes: 50, controversialScore: 3.5 }),
+    makeAlbumStat({ name: "C", averageRating: 2.4, votes: 200, controversialScore: 0.7 }),
+    makeAlbumStat({ name: "D", averageRating: 4.0, votes: 150, controversialScore: 2.2 }),
+  ];
+
+  it("sorts highest_rated", () => {
+    expect(sortStats(stats, "highest_rated").map((s) => s.name)).toEqual(["B", "D", "A", "C"]);
+  });
+
+  it("sorts lowest_rated", () => {
+    expect(sortStats(stats, "lowest_rated").map((s) => s.name)).toEqual(["C", "A", "D", "B"]);
+  });
+
+  it("sorts most_voted", () => {
+    expect(sortStats(stats, "most_voted").map((s) => s.name)).toEqual(["C", "D", "A", "B"]);
+  });
+
+  it("sorts most_controversial", () => {
+    expect(sortStats(stats, "most_controversial").map((s) => s.name)).toEqual(["B", "D", "A", "C"]);
+  });
+
+  it("does not mutate input", () => {
+    const original = stats.map((s) => s.name);
+    sortStats(stats, "highest_rated");
+    expect(stats.map((s) => s.name)).toEqual(original);
   });
 });

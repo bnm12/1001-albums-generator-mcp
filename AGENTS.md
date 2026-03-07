@@ -90,7 +90,7 @@ ratings, no reviews, no history. They are community-wide aggregates only.
 | `get_book_album_stat`             | Book list           | Looking up a specific book album's community stats                             |
 | `list_user_submitted_album_stats` | User-submitted      | Browsing albums added by the community outside the book                        |
 | `get_project_stats`               | Project             | A user's progress: how many rated, current album (slim), group info. Use `get_album_of_the_day` for full current album detail. |
-| `list_project_history`            | Project             | Browsing a user's full listening history with their ratings                    |
+| `list_project_history`            | Project             | Browsing a user's history with sort and pagination — use analysis tools first; unlimited form is a heavy escape hatch |
 | `search_project_history`          | Project             | Searching a user's history by name, artist, year, or genre                     |
 | `get_album_detail`                | Project             | Full detail for one album: review, streaming links, metadata                   |
 | `get_album_of_the_day`            | Project             | The album currently assigned to a project                                      |

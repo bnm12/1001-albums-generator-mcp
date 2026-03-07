@@ -1,5 +1,26 @@
 import axios from "axios";
 import { UserAlbumHistoryEntry } from "./api.js";
+import type { SlimAlbumStat, SlimHistoryEntry } from "./dto.js";
+
+export type HistorySortBy =
+  | "recent"
+  | "oldest"
+  | "highest_rated"
+  | "lowest_rated";
+
+export type StatSortBy =
+  | "highest_rated"
+  | "lowest_rated"
+  | "most_voted"
+  | "most_controversial";
+
+export interface PaginatedResponse<T> {
+  totalCount: number;
+  returnedCount: number;
+  offset: number;
+  limit: number | null;
+  results: T[];
+}
 
 export interface ApiErrorInfo {
   type:
@@ -38,6 +59,77 @@ export interface ReviewEntry {
   globalRating: number | null;
   communityDivergence: number | null;
   review: string;
+}
+
+
+export function paginateAndSort<T>(
+  items: T[],
+  options: {
+    offset?: number;
+    limit?: number;
+  },
+): PaginatedResponse<T> {
+  const offset = options.offset ?? 0;
+  const totalCount = items.length;
+
+  const sliced =
+    options.limit !== undefined
+      ? items.slice(offset, offset + options.limit)
+      : items.slice(offset);
+
+  return {
+    totalCount,
+    returnedCount: sliced.length,
+    offset,
+    limit: options.limit ?? null,
+    results: sliced,
+  };
+}
+
+export function sortHistory(
+  entries: SlimHistoryEntry[],
+  sortBy: HistorySortBy,
+): SlimHistoryEntry[] {
+  const sorted = [...entries];
+  switch (sortBy) {
+    case "recent":
+      return sorted.sort((a, b) =>
+        (b.generatedAt ?? "").localeCompare(a.generatedAt ?? ""),
+      );
+    case "oldest":
+      return sorted.sort((a, b) =>
+        (a.generatedAt ?? "").localeCompare(b.generatedAt ?? ""),
+      );
+    case "highest_rated":
+      return sorted.sort((a, b) => {
+        if (a.rating === null) return 1;
+        if (b.rating === null) return -1;
+        return b.rating - a.rating;
+      });
+    case "lowest_rated":
+      return sorted.sort((a, b) => {
+        if (a.rating === null) return 1;
+        if (b.rating === null) return -1;
+        return a.rating - b.rating;
+      });
+  }
+}
+
+export function sortStats(
+  stats: SlimAlbumStat[],
+  sortBy: StatSortBy,
+): SlimAlbumStat[] {
+  const sorted = [...stats];
+  switch (sortBy) {
+    case "highest_rated":
+      return sorted.sort((a, b) => b.averageRating - a.averageRating);
+    case "lowest_rated":
+      return sorted.sort((a, b) => a.averageRating - b.averageRating);
+    case "most_voted":
+      return sorted.sort((a, b) => b.votes - a.votes);
+    case "most_controversial":
+      return sorted.sort((a, b) => b.controversialScore - a.controversialScore);
+  }
 }
 
 export interface ReviewInsightsContext {
