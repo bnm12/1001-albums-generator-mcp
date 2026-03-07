@@ -3,7 +3,7 @@ assignment. Keep in mind throughout that the user did not choose these albums; t
 distribution in their history reflects what the generator assigned, and only ratings reveal
 genuine preference.
 
-Using the 1001 Albums tools, trace how my genre exposure has evolved over time for project "${args.projectIdentifier}".
+Using the 1001 Albums tools, trace how my genre exposure has evolved over time for project "${projectIdentifier}".
 
 Use list_project_history to get my full history in chronological order (sorted by generatedAt), then analyse how the genres shift across the timeline. I want to know:
 - Did I go through distinct phases or "eras" dominated by a particular genre?

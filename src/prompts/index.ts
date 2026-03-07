@@ -10,10 +10,17 @@ function loadPrompt(filename: string): string {
 }
 
 function interpolate(template: string, vars: Record<string, string>): string {
-  return Object.entries(vars).reduce(
+  const result = Object.entries(vars).reduce(
     (text, [key, value]) => text.replaceAll(`\${${key}}`, value),
     template,
   );
+  const unresolved = result.match(/\$\{[^}]+\}/g);
+  if (unresolved) {
+    throw new Error(
+      `Prompt template has unresolved placeholders: ${unresolved.join(", ")}`,
+    );
+  }
+  return result;
 }
 
 export function registerPrompts(server: McpServer): void {

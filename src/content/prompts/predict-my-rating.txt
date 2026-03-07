@@ -2,7 +2,7 @@ First, read the resource at info://1001-albums/tool-guide to orient yourself on 
   tool sequence for this kind of question, and info://1001-albums/about to understand how the
   generator assigns albums and what ratings represent.
 
-  Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${args.projectIdentifier}" and explain your reasoning.
+  Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${projectIdentifier}" and explain your reasoning.
 
   To do this well, you should:
   1. Fetch today's album using get_album_of_the_day to know what it is
