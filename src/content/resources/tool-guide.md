@@ -55,12 +55,43 @@ Identify the album by name, UUID, or \`generatedAlbumId\` from \`list_project_hi
 | Am I a harsh or generous rater? | \`get_taste_profile\` (ratingTendencies) |
 | Do I agree or disagree with the community? | \`get_taste_profile\` (communityAlignment) |
 | Which albums did I rate very differently from the community? | \`get_rating_outliers\` |
+| What does this user value/dislike in a specific genre or with a specific artist? | \`get_review_insights\` (query pattern) |
+| What qualitative context exists for predicting today's album rating? | \`get_review_insights\` (albumIdentifier pattern) |
 | How has my genre exposure evolved over time? | \`list_project_history\` sorted by generatedAt, then analyse |
 
 \`get_rating_outliers\` takes a \`direction\` parameter: "\`underrated\`" (user rated lower than
 community), "\`overrated\`" (user rated higher), or "\`both\`". Use "\`both\`" for open-ended
 taste questions, and a specific direction when the user asks about hidden gems or
 controversial takes.
+
+---
+
+## Using review insights for rating prediction
+
+Numerical rating tools (`get_taste_profile`, `get_rating_outliers`) tell you *what* a
+user rated. `get_review_insights` tells you *why* — which is often more predictive.
+
+**Recommended workflow for `predict-my-rating`:**
+
+1. `get_album_of_the_day` → get today's album name, genres, styles, artist
+2. `get_taste_profile` → baseline numerical picture
+3. `get_album_context` → artist arc and musical connections with their ratings
+4. `get_review_insights` with `albumIdentifier` = today's album → qualitative synthesis
+   of reviews from stylistically connected albums in the user's history
+5. Weigh the synthesis from step 4 alongside the numbers from steps 2–3.
+   When review reasoning and numerical scores conflict, the review reasoning is usually
+   the more reliable signal — a 2/5 with a review saying "I normally love this genre"
+   tells you more than the 2/5 alone.
+
+**Recommended workflow for open taste questions:**
+
+- "What does this user think of David Bowie?" →
+  `get_review_insights({ query: "David Bowie" })`
+- "What is this user's relationship with jazz?" →
+  `get_review_insights({ query: "Jazz" })`
+- "Why does this user rate experimental music so variably?" →
+  `get_review_insights({ query: "Experimental" })` then compare with
+  `get_rating_outliers` to see if high-divergence albums cluster in that genre
 
 ---
 
@@ -131,4 +162,8 @@ type:
 - **Treat similarity scores with low shared album counts cautiously.** A score based on
   2–3 shared albums is not meaningful. Always report \`sharedAlbumsCount\` alongside any
   similarity score.
+- **Don't rely on ratings alone for prediction.** If the user has written reviews,
+  `get_review_insights` will give you qualitative reasoning that is often more predictive
+  than any rating-based tool. Always check `totalReviewedEntries` in the metadata — if
+  it is greater than 0, the user has reviews worth consulting.
 

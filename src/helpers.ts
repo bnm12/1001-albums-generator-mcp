@@ -27,6 +27,26 @@ export interface CompatibilityMatrix {
   memberAverages: { member: string; averageSimilarity: number | null }[];
 }
 
+export interface ReviewEntry {
+  generatedAlbumId: string;
+  albumName: string;
+  artist: string;
+  releaseDate: string;
+  genres: string[];
+  styles: string[];
+  userRating: number;
+  globalRating: number | null;
+  communityDivergence: number | null;
+  review: string;
+}
+
+export interface ReviewInsightsContext {
+  selectedReviews: ReviewEntry[];
+  totalReviewedEntries: number;
+  matchingEntries: number;
+  wasCapped: boolean;
+}
+
 export function calculateProjectStats(history: UserAlbumHistoryEntry[]) {
   const albumsGenerated = history.length;
   const albumsRated = history.filter(
@@ -227,6 +247,92 @@ export function computeCompatibilityMatrix(
   });
 
   return { pairs, mostCompatible, leastCompatible, memberAverages };
+}
+
+export function buildReviewInsightsContext(
+  history: UserAlbumHistoryEntry[],
+  query: string | undefined,
+  albumIdentifier: string | undefined,
+  limit: number,
+): ReviewInsightsContext {
+  const reviewed = history.filter(
+    (h) =>
+      typeof h.review === "string" &&
+      h.review.trim().length > 0 &&
+      typeof h.rating === "number" &&
+      h.rating > 0,
+  ) as (UserAlbumHistoryEntry & { rating: number; review: string })[];
+
+  const totalReviewedEntries = reviewed.length;
+  let filtered = reviewed;
+
+  if (albumIdentifier) {
+    const lowerIdentifier = albumIdentifier.toLowerCase();
+    const targetEntry = history.find(
+      (h) =>
+        h.album.name.toLowerCase() === lowerIdentifier ||
+        h.album.uuid === albumIdentifier ||
+        h.generatedAlbumId === albumIdentifier,
+    );
+
+    if (targetEntry) {
+      const targetGenres = new Set(targetEntry.album.genres);
+      const targetStyles = new Set(targetEntry.album.styles ?? []);
+      const targetArtist = targetEntry.album.artist.toLowerCase();
+
+      filtered = reviewed.filter((h) => {
+        if (h.album.uuid === targetEntry.album.uuid) return false;
+        if (h.album.artist.toLowerCase() === targetArtist) return true;
+        if (h.album.genres.some((g) => targetGenres.has(g))) return true;
+        if ((h.album.styles ?? []).some((s) => targetStyles.has(s))) return true;
+        return false;
+      });
+    }
+  } else if (query) {
+    const lowerQuery = query.toLowerCase();
+    filtered = reviewed.filter(
+      (h) =>
+        h.album.name.toLowerCase().includes(lowerQuery) ||
+        h.album.artist.toLowerCase().includes(lowerQuery) ||
+        h.album.genres.some((g) => g.toLowerCase().includes(lowerQuery)) ||
+        (h.album.styles ?? []).some((s) => s.toLowerCase().includes(lowerQuery)),
+    );
+  }
+
+  const matchingEntries = filtered.length;
+
+  const ranked = [...filtered].sort((a, b) => {
+    const divA =
+      typeof a.globalRating === "number"
+        ? Math.abs(a.rating - a.globalRating)
+        : -1;
+    const divB =
+      typeof b.globalRating === "number"
+        ? Math.abs(b.rating - b.globalRating)
+        : -1;
+    return divB - divA;
+  });
+
+  const selected = ranked.slice(0, limit);
+  const wasCapped = matchingEntries > limit;
+
+  const selectedReviews: ReviewEntry[] = selected.map((h) => ({
+    generatedAlbumId: h.generatedAlbumId,
+    albumName: h.album.name,
+    artist: h.album.artist,
+    releaseDate: h.album.releaseDate,
+    genres: h.album.genres,
+    styles: h.album.styles ?? [],
+    userRating: h.rating,
+    globalRating: typeof h.globalRating === "number" ? h.globalRating : null,
+    communityDivergence:
+      typeof h.globalRating === "number"
+        ? Math.round(Math.abs(h.rating - h.globalRating) * 100) / 100
+        : null,
+    review: h.review,
+  }));
+
+  return { selectedReviews, totalReviewedEntries, matchingEntries, wasCapped };
 }
 
 export function requireParam(

@@ -7,8 +7,9 @@ First, read the resource at info://1001-albums/tool-guide to orient yourself on 
   To do this well, you should:
   1. Fetch today's album using get_album_of_the_day to know what it is
   2. Fetch my taste profile using get_taste_profile to understand my genre preferences, decade affinities, rating tendencies, and community alignment
-  3. Search my history using search_project_history for albums in the same genre, style, or by the same artist to find relevant past ratings and reviews
-  4. Use get_album_context to understand how this album fits musically into what I've already heard
-  5. Use get_rating_outliers to understand whether I tend to agree or disagree with the community on albums like this
+  3. Use get_review_insights with albumIdentifier set to today's album to synthesise qualitative insight from reviews of stylistically connected albums in my history. This gives you the reasoning behind my past ratings, not just the numbers — treat this as a primary signal for prediction.
+  4. Search my history using search_project_history if you need to look up ratings for a specific artist or album not covered by the above steps
+  5. Use get_album_context to understand how this album fits musically into what I've already heard
+  6. Use get_rating_outliers to understand whether I tend to agree or disagree with the community on albums like this
 
   Then give me a specific predicted rating (e.g. 3.5/5) with a confidence level and a detailed explanation of your reasoning — referencing my actual past ratings and reviews as evidence. Flag any uncertainties, e.g. if I have little history in this genre.

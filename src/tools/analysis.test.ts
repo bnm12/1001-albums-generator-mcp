@@ -5,7 +5,7 @@ import {
   getToolResponseText,
   makeAxiosError,
 } from "../test/assertions.js";
-import { createTestClient, type TestClient } from "../test/create-test-client.js";
+import { createTestClient, setupSamplingHandler, type TestClient } from "../test/create-test-client.js";
 import { makeAlbum, makeHistoryEntry, makeProjectInfo } from "../test/fixtures.js";
 import { makeMockClient } from "../test/mock-client.js";
 
@@ -101,6 +101,104 @@ describe("analysis tools", () => {
         arguments: { projectIdentifier: "p1" },
       });
       expect(getToolResponseText(result)).toContain("Error:");
+    });
+  });
+
+
+  describe("get_review_insights", () => {
+    beforeEach(async () => {
+      await testClient.cleanup();
+      testClient = await createTestClient(mockClient, { sampling: {} });
+      setupSamplingHandler(
+        testClient.client,
+        "This listener values atmospheric and emotionally resonant music.",
+      );
+    });
+
+    it("returns synthesis text when sampling succeeds", async () => {
+      const history = [
+        makeHistoryEntry({
+          review: "Beautiful and haunting.",
+          rating: 5,
+          album: makeAlbum({ genres: ["Jazz"] }),
+        }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect(String(data.synthesis)).toContain("atmospheric");
+      expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(true);
+      expect((data.metadata as { reviewsUsed: number }).reviewsUsed).toBe(1);
+    });
+
+    it("falls back with raw reviews when sampling unavailable", async () => {
+      await testClient.cleanup();
+      testClient = await createTestClient(mockClient, {});
+
+      const history = [
+        makeHistoryEntry({ review: "Loved the rhythm section.", rating: 4 }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(false);
+      expect(String(data.synthesis)).toContain("Sampling is not available");
+      expect(String(data.synthesis)).toContain("Loved the rhythm section");
+    });
+
+    it("returns null synthesis when no reviewed entries match", async () => {
+      mockClient.getProject.mockResolvedValue(
+        makeProjectInfo({ history: [makeHistoryEntry({ review: "" })] }),
+      );
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project", query: "Jazz" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect(data.synthesis).toBeNull();
+      expect(data.reason).toBeDefined();
+    });
+
+    it("returns expected metadata fields", async () => {
+      const history = [
+        makeHistoryEntry({ review: "Gorgeous tone colors.", rating: 5 }),
+        makeHistoryEntry({ generatedAlbumId: "2", review: "Too repetitive.", rating: 2 }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project", limit: 1 },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect(data.metadata).toMatchObject({
+        totalReviewedEntries: expect.any(Number),
+        matchingEntries: expect.any(Number),
+        reviewsUsed: expect.any(Number),
+        wasCapped: expect.any(Boolean),
+        samplingUsed: expect.any(Boolean),
+      });
+    });
+
+    it("returns error for empty projectIdentifier", async () => {
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "" },
+      });
+      assertToolError(result, "projectIdentifier");
     });
   });
 

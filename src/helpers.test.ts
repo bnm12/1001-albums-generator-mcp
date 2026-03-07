@@ -1,6 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { describe, expect, it } from "vitest";
 import {
+  buildReviewInsightsContext,
   calculateProjectStats,
   computeCompatibilityMatrix,
   computePairSimilarity,
@@ -15,6 +16,7 @@ import {
   topN,
 } from "./helpers.js";
 import { makeAlbum, makeHistoryEntry } from "./test/fixtures.js";
+import type { UserAlbumHistoryEntry } from "./api.js";
 
 describe("helpers", () => {
   it("calculateProjectStats counts only numeric ratings > 0", () => {
@@ -301,6 +303,181 @@ describe("helpers", () => {
     if (typeof ws === "object") {
       expect(ws.response.content[0].text).toContain("group name in lowercase with hyphens");
     }
+  });
+});
+
+
+describe("buildReviewInsightsContext", () => {
+  let seq = 0;
+
+  function makeReviewedEntry(overrides?: {
+    albumName?: string;
+    artist?: string;
+    genres?: string[];
+    styles?: string[];
+    rating?: number;
+    globalRating?: number;
+    review?: string;
+    uuid?: string;
+  }): UserAlbumHistoryEntry {
+    seq += 1;
+    const entry = makeHistoryEntry({
+      generatedAlbumId: `g-${seq}`,
+      rating: overrides?.rating ?? 4,
+      review: overrides?.review ?? "A solid and memorable record.",
+      album: makeAlbum({
+        name: overrides?.albumName ?? "Test Album",
+        artist: overrides?.artist ?? "Test Artist",
+        genres: overrides?.genres ?? ["Rock"],
+        styles: overrides?.styles ?? ["Classic Rock"],
+        uuid: overrides?.uuid ?? `uuid-${seq}`,
+      }),
+      globalRating: overrides?.globalRating === undefined ? 3.5 : overrides.globalRating,
+    });
+
+    return entry;
+  }
+
+  it("filters to only entries with non-empty reviews", () => {
+    const history = [
+      makeReviewedEntry({ review: "Great dynamics." }),
+      makeReviewedEntry({ review: "Excellent atmosphere." }),
+      makeHistoryEntry({ review: "" }),
+      makeHistoryEntry({ generatedAlbumId: "x-2", review: "   " }),
+      makeHistoryEntry({ generatedAlbumId: "x-3", review: undefined }),
+    ];
+
+    const result = buildReviewInsightsContext(history, undefined, undefined, 15);
+    expect(result.totalReviewedEntries).toBe(2);
+    expect(result.matchingEntries).toBe(2);
+    expect(result.selectedReviews).toHaveLength(2);
+  });
+
+  it("filters out entries with rating 0 or non-numeric rating", () => {
+    const history = [
+      makeReviewedEntry({ rating: 4, review: "Valid" }),
+      makeHistoryEntry({ generatedAlbumId: "x-4", rating: 0, review: "Has words" }),
+      makeHistoryEntry({ generatedAlbumId: "x-5", rating: null, review: "Has words" }),
+      makeHistoryEntry({ generatedAlbumId: "x-6", rating: undefined, review: "Has words" }),
+    ];
+
+    const result = buildReviewInsightsContext(history, undefined, undefined, 15);
+    expect(result.totalReviewedEntries).toBe(1);
+    expect(result.selectedReviews).toHaveLength(1);
+  });
+
+  it("query filtering matches artist", () => {
+    const history = [
+      makeReviewedEntry({ artist: "David Bowie" }),
+      makeReviewedEntry({ artist: "The David Bowie Band" }),
+      makeReviewedEntry({ artist: "Miles Davis" }),
+      makeReviewedEntry({ artist: "Talk Talk" }),
+      makeReviewedEntry({ artist: "Can" }),
+    ];
+
+    const result = buildReviewInsightsContext(history, "David Bowie", undefined, 15);
+    expect(result.matchingEntries).toBe(2);
+    expect(result.selectedReviews.every((r) => r.artist.includes("David Bowie"))).toBe(true);
+  });
+
+  it("query filtering matches genre case-insensitively", () => {
+    const history = [
+      makeReviewedEntry({ genres: ["Jazz"] }),
+      makeReviewedEntry({ genres: ["Free Jazz"] }),
+      makeReviewedEntry({ genres: ["Rock"] }),
+    ];
+
+    const result = buildReviewInsightsContext(history, "jazz", undefined, 15);
+    expect(result.matchingEntries).toBe(2);
+  });
+
+  it("query filtering with no matches returns empty", () => {
+    const history = [makeReviewedEntry({ artist: "Miles Davis" })];
+    const result = buildReviewInsightsContext(history, "ambient techno", undefined, 15);
+    expect(result.matchingEntries).toBe(0);
+    expect(result.selectedReviews).toEqual([]);
+  });
+
+  it("album-anchored filtering uses artist genre and style and excludes target", () => {
+    const target = makeReviewedEntry({
+      albumName: "Kind of Blue",
+      artist: "Miles Davis",
+      genres: ["Jazz"],
+      styles: ["Modal Jazz"],
+      uuid: "target-uuid",
+    });
+    const sameArtist = makeReviewedEntry({ artist: "Miles Davis", genres: ["Fusion"] });
+    const sameGenre = makeReviewedEntry({ artist: "John Coltrane", genres: ["Jazz"] });
+    const sameStyle = makeReviewedEntry({ artist: "Bill Evans", styles: ["Modal Jazz"] });
+    const different = makeReviewedEntry({ artist: "Nirvana", genres: ["Rock"], styles: ["Grunge"] });
+
+    const result = buildReviewInsightsContext([target, sameArtist, sameGenre, sameStyle, different], undefined, "Kind of Blue", 15);
+    expect(result.selectedReviews.map((r) => r.artist).sort()).toEqual(["Bill Evans", "John Coltrane", "Miles Davis"].sort());
+    expect(result.selectedReviews.some((r) => r.albumName === "Kind of Blue")).toBe(false);
+    expect(result.selectedReviews.some((r) => r.artist === "Nirvana")).toBe(false);
+  });
+
+  it("album-anchored unknown identifier falls back to all reviewed", () => {
+    const history = [makeReviewedEntry(), makeReviewedEntry({ artist: "Can" })];
+    const result = buildReviewInsightsContext(history, undefined, "no-such-album", 15);
+    expect(result.matchingEntries).toBe(result.totalReviewedEntries);
+  });
+
+  it("prioritises by community divergence descending", () => {
+    const history = [
+      makeReviewedEntry({ rating: 3.6, globalRating: 3.5 }),
+      makeReviewedEntry({ rating: 5, globalRating: 3 }),
+      makeReviewedEntry({ rating: 4, globalRating: 3.5 }),
+      makeReviewedEntry({ rating: 4.5, globalRating: 3 }),
+      makeReviewedEntry({ rating: 5, globalRating: 2 }),
+    ];
+    const result = buildReviewInsightsContext(history, undefined, undefined, 15);
+    expect(result.selectedReviews[0].communityDivergence).toBe(3);
+    expect(result.selectedReviews[4].communityDivergence).toBe(0.1);
+  });
+
+  it("entries with no globalRating sort after entries with globalRating", () => {
+    const withGlobal = makeReviewedEntry({ globalRating: 3 });
+    const withoutGlobal = makeReviewedEntry();
+    withoutGlobal.globalRating = undefined;
+    const result = buildReviewInsightsContext([withoutGlobal, withGlobal], undefined, undefined, 15);
+    expect(result.selectedReviews[0].globalRating).not.toBeNull();
+    expect(result.selectedReviews[1].globalRating).toBeNull();
+  });
+
+  it("applies limit after sorting and sets wasCapped", () => {
+    const history = Array.from({ length: 10 }, (_, i) =>
+      makeReviewedEntry({ rating: 5, globalRating: 5 - i * 0.2 }),
+    );
+    const result = buildReviewInsightsContext(history, undefined, undefined, 3);
+    expect(result.selectedReviews).toHaveLength(3);
+    expect(result.wasCapped).toBe(true);
+    expect(result.selectedReviews[0].communityDivergence).toBeGreaterThanOrEqual(result.selectedReviews[1].communityDivergence ?? 0);
+  });
+
+  it("wasCapped is false when within limit", () => {
+    const history = [makeReviewedEntry(), makeReviewedEntry(), makeReviewedEntry()];
+    const result = buildReviewInsightsContext(history, undefined, undefined, 15);
+    expect(result.wasCapped).toBe(false);
+  });
+
+  it("returns review entry shape with rounded divergence", () => {
+    const a = makeReviewedEntry({ rating: 4, globalRating: 2.666 });
+    const b = makeReviewedEntry({ rating: 4 });
+    b.globalRating = undefined;
+    const result = buildReviewInsightsContext([a, b], undefined, undefined, 15);
+    expect(result.selectedReviews[0]).toMatchObject({
+      generatedAlbumId: expect.any(String),
+      albumName: expect.any(String),
+      artist: expect.any(String),
+      releaseDate: expect.any(String),
+      genres: expect.any(Array),
+      styles: expect.any(Array),
+      userRating: expect.any(Number),
+      review: expect.any(String),
+    });
+    expect(result.selectedReviews[0].communityDivergence).toBe(1.33);
+    expect(result.selectedReviews.find((r) => r.globalRating === null)?.communityDivergence).toBeNull();
   });
 });
 

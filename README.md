@@ -163,6 +163,7 @@ Restart Claude Desktop after any config change.
 | `get_taste_profile`   | Comprehensive taste profile: decade distribution, top genres/styles/artists, rating tendencies, community alignment |
 | `get_rating_outliers` | Albums where the user diverges most from community consensus, in either direction                                   |
 | `get_album_context`   | Rich contextual data: artist arc, musical connections, community divergence, listening journey                      |
+| `get_review_insights` | Synthesises qualitative insight from written reviews via MCP Sampling — album-anchored or open query |
 
 ### Group Analysis Tools
 
@@ -186,6 +187,10 @@ Restart Claude Desktop after any config change.
 | Tool           | Description                                                                |
 | -------------- | -------------------------------------------------------------------------- |
 | `refresh_data` | Force-refresh cached data (`global`, `user`, `project`, `group`, or `all`) |
+
+> **Note on `get_review_insights`:** This tool uses MCP Sampling and requires the
+> connected client to declare sampling capability. Claude Desktop supports sampling.
+> Clients that do not support sampling receive a fallback response with raw review text.
 
 > **Note on detail vs. list tools:** List and search tools return a slim format — no reviews, streaming IDs, or images — to keep responses concise. Call `get_album_detail` when you need a written review, a Spotify/Apple Music link, or full genre breakdown.
 
