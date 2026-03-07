@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { AlbumsGeneratorClient } from "../api.js";
+import { AlbumsGeneratorClient, type UserAlbumHistoryEntry } from "../api.js";
 import {
   buildReviewInsightsContext,
   computeRatingTendencies,
@@ -10,9 +10,254 @@ import {
   ratingAffinityMap,
   requireParam,
 } from "../helpers.js";
-import { slimHistoryEntry } from "../dto.js";
+import {
+  type ArcMilestone,
+  type ArcSegment,
+  type ListeningArcPayload,
+  slimHistoryEntry,
+} from "../dto.js";
 import { makeRegisterTool } from "./register-tool.js";
 
+
+
+interface ArcPointSource {
+  generatedAlbumId: string;
+  albumName: string;
+  albumArtist: string;
+  rating: number | null;
+  globalRating?: number;
+  listenedAt: string;
+  genres: string[];
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function toMs(dateText: string): number {
+  return new Date(dateText).getTime();
+}
+
+function getSegmentLabel(kind: "single" | "phase" | "year", index: number, year?: string): string {
+  if (kind === "single") return "Your Journey";
+  if (kind === "year") return `Year ${year ?? "Unknown"}`;
+  return `Phase ${index + 1}`;
+}
+
+function getTopGenresByAverageRating(entries: ArcPointSource[]): string[] {
+  const rated = entries.filter((e): e is ArcPointSource & { rating: number } => typeof e.rating === "number");
+  const genreStats = new Map<string, { total: number; count: number }>();
+
+  for (const entry of rated) {
+    for (const genre of entry.genres) {
+      const prev = genreStats.get(genre) ?? { total: 0, count: 0 };
+      genreStats.set(genre, { total: prev.total + entry.rating, count: prev.count + 1 });
+    }
+  }
+
+  return [...genreStats.entries()]
+    .map(([genre, stats]) => ({ genre, average: stats.total / stats.count }))
+    .sort((a, b) => b.average - a.average)
+    .slice(0, 3)
+    .map((x) => x.genre);
+}
+
+function characterForSegment(avgRating: number | null, avgCommunityDelta: number | null): string {
+  const labels: string[] = [];
+
+  if (avgRating !== null) {
+    if (avgRating > 3.8) labels.push("high enthusiasm");
+    else if (avgRating < 2.5) labels.push("critical period");
+  }
+
+  if (avgCommunityDelta !== null) {
+    if (avgCommunityDelta > 0.5) labels.push("above community consensus");
+    else if (avgCommunityDelta < -0.5) labels.push("below community consensus");
+  }
+
+  return labels.length > 0 ? labels.slice(0, 2).join(", ") : "mixed";
+}
+
+function buildSegment(windowAlbums: ArcPointSource[], start: number, end: number, label: string): ArcSegment {
+  const entries = windowAlbums.slice(start, end + 1);
+  const rated = entries.filter((e): e is ArcPointSource & { rating: number } => typeof e.rating === "number");
+  const ratedWithGlobal = rated.filter((e): e is ArcPointSource & { rating: number; globalRating: number } => typeof e.globalRating === "number");
+
+  const avgRating = rated.length > 0 ? round2(rated.reduce((sum, e) => sum + e.rating, 0) / rated.length) : null;
+  const avgCommunityDelta = ratedWithGlobal.length > 0
+    ? round2(ratedWithGlobal.reduce((sum, e) => sum + (e.rating - e.globalRating), 0) / ratedWithGlobal.length)
+    : null;
+
+  return {
+    label,
+    character: characterForSegment(avgRating, avgCommunityDelta),
+    start_index: start,
+    end_index: end,
+    album_count: entries.length,
+    rated_count: rated.length,
+    avg_rating: avgRating,
+    avg_community_delta: avgCommunityDelta,
+    top_genres: getTopGenresByAverageRating(entries),
+    date_range: { from: entries[0].listenedAt, to: entries.at(-1)?.listenedAt ?? entries[0].listenedAt },
+  };
+}
+
+function splitByCountWithGenreCheck(windowAlbums: ArcPointSource[]): Array<{ start: number; end: number }> {
+  const n = windowAlbums.length;
+  const base = Math.floor(n / 3);
+  const rem = n % 3;
+  const sizes = [base + (rem > 0 ? 1 : 0), base + (rem > 1 ? 1 : 0), base];
+
+  const ranges: Array<{ start: number; end: number }> = [];
+  let cursor = 0;
+  for (const size of sizes) {
+    if (size <= 0) continue;
+    ranges.push({ start: cursor, end: cursor + size - 1 });
+    cursor += size;
+  }
+
+  const sharesGenreShift = (left: { start: number; end: number }, right: { start: number; end: number }): boolean => {
+    const leftTop = getTopGenresByAverageRating(windowAlbums.slice(left.start, left.end + 1));
+    const rightTop = getTopGenresByAverageRating(windowAlbums.slice(right.start, right.end + 1));
+    if (leftTop.length === 0 || rightTop.length === 0) return false;
+    const overlap = leftTop.filter((g) => rightTop.includes(g)).length;
+    const denom = Math.min(3, leftTop.length, rightTop.length);
+    return overlap / denom < 0.5;
+  };
+
+  const merged: Array<{ start: number; end: number }> = [ranges[0]];
+  for (let i = 1; i < ranges.length; i++) {
+    const prev = merged.at(-1)!;
+    const next = ranges[i];
+    if (sharesGenreShift(prev, next)) merged.push(next);
+    else prev.end = next.end;
+  }
+
+  if (merged.length === 1 && ranges.length > 1) {
+    const midpoint = Math.floor((windowAlbums.length - 1) / 2);
+    return [
+      { start: 0, end: midpoint },
+      { start: midpoint + 1, end: windowAlbums.length - 1 },
+    ];
+  }
+
+  return merged;
+}
+
+function splitByYear(windowAlbums: ArcPointSource[]): Array<{ start: number; end: number; year: string }> {
+  const yearSegments: Array<{ start: number; end: number; year: string }> = [];
+
+  for (let i = 0; i < windowAlbums.length; i++) {
+    const year = new Date(windowAlbums[i].listenedAt).getUTCFullYear().toString();
+    const last = yearSegments.at(-1);
+    if (!last || last.year !== year) {
+      yearSegments.push({ start: i, end: i, year });
+    } else {
+      last.end = i;
+    }
+  }
+
+  const mergedSmall: Array<{ start: number; end: number; year: string }> = [];
+  for (const seg of yearSegments) {
+    if (mergedSmall.length === 0) {
+      mergedSmall.push({ ...seg });
+      continue;
+    }
+
+    const current = { ...seg };
+    const currentCount = current.end - current.start + 1;
+    if (currentCount >= 5) {
+      mergedSmall.push(current);
+      continue;
+    }
+
+    const prev = mergedSmall.at(-1)!;
+    const prevCount = prev.end - prev.start + 1;
+    if (prevCount <= currentCount || mergedSmall.length === 1) {
+      prev.end = current.end;
+      prev.year = `${prev.year}-${current.year}`;
+    } else {
+      current.start = prev.start;
+      current.year = `${prev.year}-${current.year}`;
+      mergedSmall[mergedSmall.length - 1] = current;
+    }
+  }
+
+  while (mergedSmall.length > 8) {
+    const first = mergedSmall.shift()!;
+    const second = mergedSmall.shift()!;
+    mergedSmall.unshift({
+      start: first.start,
+      end: second.end,
+      year: `${first.year}-${second.year}`,
+    });
+  }
+
+  return mergedSmall;
+}
+
+function computeRollingRating(rated: ArcPointSource[]): { position: number; avg: number; label: string }[] {
+  const windowSize = 10;
+  const stepSize = 5;
+  if (rated.length === 0) return [];
+  if (rated.length < windowSize) {
+    const mid = Math.floor(rated.length / 2);
+    return [{
+      position: mid,
+      avg: round2(rated.reduce((s, e) => s + (e.rating as number), 0) / rated.length),
+      label: rated[mid].albumName,
+    }];
+  }
+
+  const points: { position: number; avg: number; label: string }[] = [];
+  for (let i = 0; i <= rated.length - windowSize; i += stepSize) {
+    const slice = rated.slice(i, i + windowSize);
+    const mid = Math.floor(windowSize / 2);
+    points.push({
+      position: i + mid,
+      avg: round2(slice.reduce((s, e) => s + (e.rating as number), 0) / slice.length),
+      label: slice[mid].albumName,
+    });
+  }
+  return points;
+}
+
+function computeRollingDelta(entries: Array<ArcPointSource & { rating: number; globalRating: number }>): { position: number; avg_delta: number }[] {
+  const windowSize = 10;
+  const stepSize = 5;
+  if (entries.length === 0) return [];
+  if (entries.length < windowSize) {
+    return [{
+      position: Math.floor(entries.length / 2),
+      avg_delta: round2(entries.reduce((s, e) => s + (e.rating - e.globalRating), 0) / entries.length),
+    }];
+  }
+
+  const points: { position: number; avg_delta: number }[] = [];
+  for (let i = 0; i <= entries.length - windowSize; i += stepSize) {
+    const slice = entries.slice(i, i + windowSize);
+    points.push({
+      position: i + Math.floor(windowSize / 2),
+      avg_delta: round2(slice.reduce((s, e) => s + (e.rating - e.globalRating), 0) / slice.length),
+    });
+  }
+  return points;
+}
+
+function toArcSource(history: UserAlbumHistoryEntry[]): ArcPointSource[] {
+  return history
+    .filter((entry) => typeof entry.generatedAt === "string" && entry.generatedAt.length > 0)
+    .sort((a, b) => (a.generatedAt ?? "").localeCompare(b.generatedAt ?? ""))
+    .map((entry) => ({
+      generatedAlbumId: entry.generatedAlbumId,
+      albumName: entry.album.name,
+      albumArtist: entry.album.artist,
+      rating: typeof entry.rating === "number" ? entry.rating : null,
+      ...(typeof entry.globalRating === "number" && { globalRating: entry.globalRating }),
+      listenedAt: entry.generatedAt as string,
+      genres: entry.album.genres ?? [],
+    }));
+}
 export function registerAnalysisTools(
   server: McpServer,
   client: AlbumsGeneratorClient,
@@ -139,6 +384,145 @@ Combine with get_taste_profile to contextualise whether this user is generally c
       }
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+    true,
+  );
+
+  registerTool(
+    "get_listening_arc",
+    `Returns a structured, pre-segmented analysis of the user's full listening journey, designed for narrative generation. The server computes segment boundaries, rolling rating trends, community alignment drift, and notable milestones. Use this when the user asks how taste evolved over time or wants the story arc of their listening journey.`,
+    {
+      projectIdentifier: z.string().describe("The project slug or username. Required."),
+      hint: z.enum(["recent", "full"]).optional().describe(
+        "Optional bias hint. 'recent' = last ~30 albums. 'full' = entire history. Omit to let the tool choose based on history length.",
+      ),
+    },
+    async ({ projectIdentifier, hint }) => {
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+
+      const project = await client.getProject(pid);
+      const chronological = toArcSource(project.history);
+      const useRecent = hint === "recent" || (!hint && chronological.length < 20);
+      const windowAlbums = useRecent ? chronological.slice(-30) : chronological;
+      const windowLabel: "recent" | "full" = useRecent ? "recent" : "full";
+
+      const ratedAlbums = windowAlbums.filter((e): e is ArcPointSource & { rating: number } => typeof e.rating === "number");
+      const ratedWithGlobal = ratedAlbums.filter((e): e is ArcPointSource & { rating: number; globalRating: number } => typeof e.globalRating === "number");
+
+      const ratingRollingAvg = computeRollingRating(ratedAlbums);
+      const communityAlignment = computeRollingDelta(ratedWithGlobal);
+
+      let arcSegments: ArcSegment[] = [];
+      if (windowAlbums.length > 0) {
+        if (windowAlbums.length < 20) {
+          arcSegments = [buildSegment(windowAlbums, 0, windowAlbums.length - 1, getSegmentLabel("single", 0))];
+        } else if (windowAlbums.length < 60) {
+          const ranges = splitByCountWithGenreCheck(windowAlbums);
+          arcSegments = ranges.map((range, index) => buildSegment(windowAlbums, range.start, range.end, getSegmentLabel("phase", index)));
+        } else {
+          const ranges = splitByYear(windowAlbums);
+          arcSegments = ranges.map((range, index) => buildSegment(windowAlbums, range.start, range.end, getSegmentLabel("year", index, range.year)));
+        }
+      }
+
+      const milestones: ArcMilestone[] = [];
+      const pushMilestone = (
+        type: ArcMilestone["type"],
+        entry: ArcPointSource | undefined,
+        position: number,
+        value: number,
+      ) => {
+        if (!entry) return;
+        milestones.push({
+          type,
+          album: {
+            name: entry.albumName,
+            artist: entry.albumArtist,
+            generatedAlbumId: entry.generatedAlbumId,
+          },
+          position,
+          value,
+        });
+      };
+
+      const firstFiveIndex = windowAlbums.findIndex((a) => a.rating === 5);
+      if (firstFiveIndex >= 0) pushMilestone("first_five_star", windowAlbums[firstFiveIndex], firstFiveIndex, 5);
+
+      const firstOneIndex = windowAlbums.findIndex((a) => a.rating === 1);
+      if (firstOneIndex >= 0) pushMilestone("first_one_star", windowAlbums[firstOneIndex], firstOneIndex, 1);
+
+      const ratedWithIndex = windowAlbums
+        .map((a, idx) => ({ a, idx }))
+        .filter((x): x is { a: ArcPointSource & { rating: number }; idx: number } => typeof x.a.rating === "number");
+      if (ratedWithIndex.length > 0) {
+        const highest = ratedWithIndex.reduce((best, cur) => (cur.a.rating > best.a.rating ? cur : best));
+        const lowest = ratedWithIndex.reduce((best, cur) => (cur.a.rating < best.a.rating ? cur : best));
+        pushMilestone("highest_rated", highest.a, highest.idx, highest.a.rating);
+        pushMilestone("lowest_rated", lowest.a, lowest.idx, lowest.a.rating);
+      }
+
+      const withDelta = windowAlbums
+        .map((a, idx) => ({ a, idx }))
+        .filter((x): x is { a: ArcPointSource & { rating: number; globalRating: number }; idx: number } => typeof x.a.rating === "number" && typeof x.a.globalRating === "number");
+      if (withDelta.length > 0) {
+        const biggestAgree = withDelta.reduce((best, cur) => ((cur.a.rating - cur.a.globalRating) > (best.a.rating - best.a.globalRating) ? cur : best));
+        const biggestDisagree = withDelta.reduce((best, cur) => ((cur.a.rating - cur.a.globalRating) < (best.a.rating - best.a.globalRating) ? cur : best));
+        pushMilestone("biggest_community_agree", biggestAgree.a, biggestAgree.idx, round2(biggestAgree.a.rating - biggestAgree.a.globalRating));
+        pushMilestone("biggest_community_disagree", biggestDisagree.a, biggestDisagree.idx, round2(biggestDisagree.a.rating - biggestDisagree.a.globalRating));
+      }
+
+      let bestStreakStart = -1;
+      let bestStreakLen = 0;
+      let curStart = -1;
+      let curLen = 0;
+      for (let i = 0; i < windowAlbums.length; i++) {
+        if (typeof windowAlbums[i].rating === "number") {
+          if (curStart < 0) curStart = i;
+          curLen += 1;
+          if (curLen > bestStreakLen) {
+            bestStreakLen = curLen;
+            bestStreakStart = curStart;
+          }
+        } else {
+          curStart = -1;
+          curLen = 0;
+        }
+      }
+      if (bestStreakLen > 0 && bestStreakStart >= 0) {
+        pushMilestone("longest_rated_streak", windowAlbums[bestStreakStart], bestStreakStart, bestStreakLen);
+      }
+
+      if (ratingRollingAvg.length > 0) {
+        const peak = ratingRollingAvg.reduce((best, cur) => (cur.avg > best.avg ? cur : best));
+        const trough = ratingRollingAvg.reduce((best, cur) => (cur.avg < best.avg ? cur : best));
+        const peakAlbum = ratedAlbums[peak.position];
+        const troughAlbum = ratedAlbums[trough.position];
+        pushMilestone("rating_peak", peakAlbum, peak.position, peak.avg);
+        pushMilestone("rating_trough", troughAlbum, trough.position, trough.avg);
+      }
+
+      const historySpanDays = windowAlbums.length > 1
+        ? Math.max(0, Math.round((toMs(windowAlbums.at(-1)!.listenedAt) - toMs(windowAlbums[0].listenedAt)) / (1000 * 60 * 60 * 24)))
+        : 0;
+
+      const payload: ListeningArcPayload = {
+        metadata: {
+          total_albums: windowAlbums.length,
+          rated_albums: ratedAlbums.length,
+          history_span_days: historySpanDays,
+          window: windowLabel,
+          too_short_for_arc: windowAlbums.length < 10,
+        },
+        arc_segments: arcSegments,
+        milestones,
+        trend_data: {
+          rating_rolling_avg: ratingRollingAvg,
+          community_alignment: communityAlignment,
+        },
+      };
+
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
     },
     true,
   );

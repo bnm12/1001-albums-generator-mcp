@@ -133,3 +133,48 @@ export function slimGroupInfo(group: GroupInfo): SlimGroupInfo {
       : null,
   };
 }
+
+export interface ArcSegment {
+  label: string;
+  character: string;
+  start_index: number;
+  end_index: number;
+  album_count: number;
+  rated_count: number;
+  avg_rating: number | null;
+  avg_community_delta: number | null;
+  top_genres: string[];
+  date_range: { from: string; to: string };
+}
+
+export interface ArcMilestone {
+  type:
+    | "first_five_star"
+    | "first_one_star"
+    | "highest_rated"
+    | "lowest_rated"
+    | "biggest_community_agree"
+    | "biggest_community_disagree"
+    | "longest_rated_streak"
+    | "rating_peak"
+    | "rating_trough";
+  album: { name: string; artist: string; generatedAlbumId: string };
+  position: number;
+  value: number;
+}
+
+export interface ListeningArcPayload {
+  metadata: {
+    total_albums: number;
+    rated_albums: number;
+    history_span_days: number;
+    window: "recent" | "full";
+    too_short_for_arc: boolean;
+  };
+  arc_segments: ArcSegment[];
+  milestones: ArcMilestone[];
+  trend_data: {
+    rating_rolling_avg: { position: number; avg: number; label: string }[];
+    community_alignment: { position: number; avg_delta: number }[];
+  };
+}

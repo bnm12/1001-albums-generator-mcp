@@ -164,6 +164,7 @@ Restart Claude Desktop after any config change.
 | `get_rating_outliers` | Albums where the user diverges most from community consensus, in either direction                                   |
 | `get_album_context`   | Rich contextual data: artist arc, musical connections, community divergence, listening journey                      |
 | `get_review_insights` | Synthesises qualitative insight from written reviews via MCP Sampling — album-anchored or open query |
+| `get_listening_arc`  | Structured listening journey analysis: arc segments, rating trends, community alignment drift, and milestones — designed for narrative generation |
 
 ### Group Analysis Tools
 
@@ -222,6 +223,7 @@ Compatible clients (e.g. Claude Desktop) surface these as one-click conversation
 | `group-divisive-albums` | Albums that divided your group most — and ones you all agreed on |
 | `compare-members`       | Detailed taste comparison between two group members              |
 | `listening-wrapped`     | Spotify Wrapped-style summary of your listening history          |
+| `personalized-pitch`   | Persuasive, taste-grounded pitch for a specific album (or today's album by default) |
 
 ## 💬 Example Prompts
 

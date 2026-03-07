@@ -118,6 +118,7 @@ ratings, no reviews, no history. They are community-wide aggregates only.
 | `get_taste_profile`               | Project             | Overall taste summary: genres, decades, rating tendencies, community alignment |
 | `get_rating_outliers`             | Project             | Albums where the user most diverges from community consensus                   |
 | `get_review_insights`             | Project             | Qualitative synthesis of written reviews — album-anchored or open query, via MCP Sampling |
+| `get_listening_arc`               | Project             | Chronological arc analysis: segments, trends, and milestones for narrative generation |
 | `get_group`                       | Group               | Group summary: members, slim current album, all-time high/low with computed averageRating. Use `get_group_latest_album` for full latest album with votes. |
 | `get_group_latest_album`          | Group               | Latest group album with all member votes attached                              |
 | `get_group_album_reviews`         | Group album reviews | All member reviews and ratings for a specific group album                      |
