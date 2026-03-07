@@ -143,7 +143,7 @@ Restart Claude Desktop after any config change.
 | ------------------------ | ---------------------------------------------------------------------------- |
 | `get_album_of_the_day`   | Today's assigned album with full metadata and project notes                  |
 | `get_project_stats`      | Progress summary: albums generated, rated, unrated, current streak           |
-| `list_project_history`   | Full listening history in slim format (name, artist, year, genres, ratings)  |
+| `list_project_history`   | Full listening history with sort (recent/oldest/rated), pagination (limit/offset), and total count — use focused analysis tools first |
 | `search_project_history` | Search history by artist, album, year, or genre                              |
 | `get_album_detail`       | Complete detail for one album: review, streaming links, Wikipedia, subgenres |
 | `get_album_context`      | Relationships: same artist, same year, influences, styles, collaborators     |
@@ -178,9 +178,9 @@ Restart Claude Desktop after any config change.
 
 | Tool                              | Description                                               |
 | --------------------------------- | --------------------------------------------------------- |
-| `list_book_album_stats`           | Community ratings for all ~1001 canonical book albums     |
-| `get_book_album_stat`             | Look up a specific book album's community stats           |
-| `list_user_submitted_album_stats` | Stats for albums submitted by users outside the book list |
+| `list_book_album_stats`           | Community ratings for all ~1001 canonical book albums with sort and pagination |
+| `get_book_album_stat`             | Search book albums by name, artist, genre, or year |
+| `list_user_submitted_album_stats` | Stats for user-submitted albums with sort and pagination |
 
 ### Utility
 

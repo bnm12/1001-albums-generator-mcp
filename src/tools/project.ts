@@ -2,7 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { AlbumsGeneratorClient } from "../api.js";
 import { slimAlbum, slimHistoryEntry } from "../dto.js";
-import { calculateProjectStats, getRatedEntries, getYear, requireParam } from "../helpers.js";
+import {
+  calculateProjectStats,
+  getRatedEntries,
+  getYear,
+  paginateAndSort,
+  requireParam,
+  sortHistory,
+} from "../helpers.js";
 import { makeRegisterTool } from "./register-tool.js";
 
 export function registerProjectTools(
@@ -50,16 +57,77 @@ export function registerProjectTools(
 
   registerTool(
     "list_project_history",
-    "Returns the full generated history for a project. Each entry includes: generatedAlbumId, album name, artist, release year, genres, the user's rating (1–5, or null if unrated), global community rating, and date generated. Reviews and full album detail (streaming IDs, images, Wikipedia, subgenres) are intentionally omitted to keep the response manageable — use get_album_detail to retrieve complete information for a specific album. Use this to browse, filter, or analyse the user's listening history. Requires a projectIdentifier. Data is cached for 4 hours.",
+    `Returns a project's generated album history in slim format. Each entry includes:
+generatedAlbumId, album name, artist, release year, genres, the user's rating (1–5 or
+null if unrated), global community rating, and date generated. Reviews, streaming links,
+images, and subgenres are intentionally omitted — use get_album_detail for those.
+
+Results are wrapped in a pagination envelope:
+  totalCount    — total entries in the full history (before limit/offset)
+  returnedCount — number of entries in this response
+  offset        — starting position used
+  limit         — limit applied (null if no limit was set)
+  results       — the album entries
+
+Default sort is "recent" (most recently assigned first).
+
+⚠ USAGE GUIDANCE — READ BEFORE CALLING WITHOUT A LIMIT:
+
+Before calling this tool, consider whether a more focused tool already solves your need:
+  - Taste analysis, genre/decade breakdown     → get_taste_profile
+  - Find albums by artist, genre, year         → search_project_history
+  - Album-level detail, reviews, streaming     → get_album_detail
+  - Artist arc and musical connections         → get_album_context
+  - Rating divergence from community           → get_rating_outliers
+  - Qualitative insight from written reviews   → get_review_insights
+
+Calling without a limit returns the FULL history — potentially hundreds or thousands of
+entries — as a single response. This is very heavy on context window usage and will
+consume a large portion of available tokens. It is NOT necessary for most analysis tasks
+because the dedicated analysis tools above already operate on the full history server-side
+and return compact, pre-processed results.
+
+Use the unlimited form ONLY when:
+  - No other tool covers the specific question (e.g. "what did I listen to on a
+    specific date", chronological exploration, custom analysis not served by existing tools)
+  - You have confirmed the project's totalCount (visible in any paginated response or
+    from get_project_stats) is small enough to load safely
+  - You genuinely need the raw entry data rather than a processed result
+
+When in doubt, start with limit: 50 and offset: 0, check totalCount in the response,
+and decide whether to fetch more.`,
     {
-      projectIdentifier: z.string().describe("The name of the project or the sharerId"),
+      projectIdentifier: z.string().describe(
+        "The name of the project or the sharerId",
+      ),
+      sortBy: z
+        .enum(["recent", "oldest", "highest_rated", "lowest_rated"])
+        .default("recent")
+        .describe(
+          "Sort order. 'recent' = most recently assigned first (default). " +
+            "'oldest' = earliest assigned first. " +
+            "'highest_rated' = user's highest rated first, unrated entries last. " +
+            "'lowest_rated' = user's lowest rated first, unrated entries last.",
+        ),
+      limit: z.number().int().min(1).optional().describe(
+        "Maximum number of entries to return. Omit to return all entries. See usage note in tool description.",
+      ),
+      offset: z.number().int().min(0).default(0).describe(
+        "Number of entries to skip before returning results. Use with limit for pagination. Default 0.",
+      ),
     },
-    async ({ projectIdentifier }) => {
+    async ({ projectIdentifier, sortBy, limit, offset }) => {
       const pid = requireParam(projectIdentifier, "projectIdentifier");
       if (typeof pid === "object" && "error" in pid) return pid.response;
+
       const project = await client.getProject(pid);
       const slim = project.history.map(slimHistoryEntry);
-      return { content: [{ type: "text", text: JSON.stringify(slim, null, 2) }] };
+      const sorted = sortHistory(slim, sortBy);
+      const paginated = paginateAndSort(sorted, { limit, offset });
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(paginated, null, 2) }],
+      };
     },
     true,
   );

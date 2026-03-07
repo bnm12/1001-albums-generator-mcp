@@ -23,7 +23,8 @@ For group questions, start with:
 | Question | Tool |
 |---|---|
 | What is today's album? | \`get_album_of_the_day\` |
-| Show me my full history | \`list_project_history\` |
+| Browse history with sort and pagination | `list_project_history` (with limit, offset, sortBy) |
+| Get full raw history (heavy — read description first) | `list_project_history` (no limit) |
 | Find albums by artist, genre, or year | \`search_project_history\` |
 | Get full detail, review, and streaming links for one album | \`get_album_detail\` |
 
@@ -128,8 +129,8 @@ These tools query the global community dataset, not any individual project:
 
 | Question | Tool |
 |---|---|
-| What are the highest-rated book album globally? | \`list_book_album_stats\` |
-| How does the community rate a specific book album? | \`get_book_album_stat\` |
+| Top-rated / most controversial / most voted book albums | `list_book_album_stats` (with sortBy and limit) |
+| Search book albums by name, artist, genre, or year | `get_book_album_stat` |
 | What user-submitted albums exist outside the book? | \`list_user_submitted_album_stats\` |
 
 These tools return community-wide data only — no individual ratings, no project history.
@@ -151,6 +152,12 @@ type:
 
 ## Common mistakes to avoid
 
+- **Don't call `list_project_history` without a limit unless no other tool fits.**
+  The full history can be hundreds or thousands of entries. Always check whether
+  `get_taste_profile`, `search_project_history`, `get_album_context`,
+  `get_rating_outliers`, or `get_review_insights` already answers the question with
+  a compact, pre-processed result. Use `get_project_stats` to check `albumsGenerated`
+  before deciding to fetch the full list.
 - **Don't use listen count as a proxy for preference.** Albums are assigned randomly.
   Always use ratings as the preference signal.
 - **Don't skip \`get_group\` before group tools.** The member \`projectIdentifier\` list it

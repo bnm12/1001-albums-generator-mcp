@@ -60,29 +60,122 @@ describe("project tools", () => {
     assertToolError(bad, "projectIdentifier");
   });
 
-  it("list_project_history returns slim history", async () => {
+  it("list_project_history returns paginated slim history envelope", async () => {
     mockClient.getProject.mockResolvedValue(
       makeProjectInfo({
         history: [
-          makeHistoryEntry({ rating: 4, review: "review", album: makeAlbum({ spotifyId: "sp" }) }),
-          makeHistoryEntry({ generatedAlbumId: "2", rating: "did-not-listen" }),
+          makeHistoryEntry({ rating: 4, review: "review", album: makeAlbum({ spotifyId: "sp" }), generatedAt: "2024-01-01T00:00:00.000Z" }),
+          makeHistoryEntry({ generatedAlbumId: "2", rating: "did-not-listen", generatedAt: "2024-02-01T00:00:00.000Z" }),
         ],
       }),
     );
     const result = await testClient.client.callTool({ name: "list_project_history", arguments: { projectIdentifier: "p1" } });
-    const data = assertToolSuccess(result) as Array<Record<string, unknown>>;
-    expect(data).toHaveLength(2);
-    expect(data[0].rating).toBe(4);
-    expect(data[1].rating).toBeNull();
-    expect(data[0]).not.toHaveProperty("review");
-    expect((data[0].album as Record<string, unknown>)).not.toHaveProperty("spotifyId");
-
-    mockClient.getProject.mockResolvedValueOnce(makeProjectInfo({ history: [] }));
-    const empty = await testClient.client.callTool({ name: "list_project_history", arguments: { projectIdentifier: "p1" } });
-    expect(assertToolSuccess(empty)).toEqual([]);
+    const data = assertToolSuccess(result) as Record<string, unknown>;
+    expect(data).toMatchObject({ totalCount: 2, returnedCount: 2, offset: 0, limit: null });
+    const results = data.results as Array<Record<string, unknown>>;
+    expect(results).toHaveLength(2);
+    expect(results[0].rating).toBeNull();
+    expect(results[1].rating).toBe(4);
+    expect(results[0]).not.toHaveProperty("review");
+    expect((results[0].album as Record<string, unknown>)).not.toHaveProperty("spotifyId");
 
     const bad = await testClient.client.callTool({ name: "list_project_history", arguments: { projectIdentifier: "" } });
     assertToolError(bad, "projectIdentifier");
+  });
+
+
+  describe("list_project_history — pagination and sorting", () => {
+    it("defaults to recent sort when sortBy is omitted", async () => {
+      const history = [
+        makeHistoryEntry({ generatedAt: "2024-01-01T00:00:00.000Z", album: makeAlbum({ name: "Older" }) }),
+        makeHistoryEntry({ generatedAt: "2024-06-01T00:00:00.000Z", album: makeAlbum({ name: "Newer" }) }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      const result = await testClient.client.callTool({
+        name: "list_project_history",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as any;
+      expect(data.results[0].album.name).toBe("Newer");
+      expect(data.results[1].album.name).toBe("Older");
+    });
+
+    it("returns pagination envelope with correct fields", async () => {
+      const history = Array.from({ length: 10 }, (_, i) =>
+        makeHistoryEntry({ album: makeAlbum({ name: `Album ${i}` }) }),
+      );
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      const result = await testClient.client.callTool({
+        name: "list_project_history",
+        arguments: { projectIdentifier: "my-project", limit: 3, offset: 0 },
+      });
+
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(10);
+      expect(data.returnedCount).toBe(3);
+      expect(data.offset).toBe(0);
+      expect(data.limit).toBe(3);
+      expect(data.results).toHaveLength(3);
+    });
+
+    it("returns all entries and limit: null when no limit specified", async () => {
+      const history = Array.from({ length: 5 }, (_, i) =>
+        makeHistoryEntry({ album: makeAlbum({ name: `Album ${i}` }) }),
+      );
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      const result = await testClient.client.callTool({
+        name: "list_project_history",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as any;
+      expect(data.limit).toBeNull();
+      expect(data.totalCount).toBe(5);
+      expect(data.returnedCount).toBe(5);
+    });
+
+    it("respects offset parameter", async () => {
+      const history = Array.from({ length: 5 }, (_, i) =>
+        makeHistoryEntry({
+          generatedAt: `2024-0${i + 1}-01T00:00:00.000Z`,
+          album: makeAlbum({ name: `Album ${i}` }),
+        }),
+      );
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      const result = await testClient.client.callTool({
+        name: "list_project_history",
+        arguments: {
+          projectIdentifier: "my-project",
+          sortBy: "oldest",
+          limit: 2,
+          offset: 2,
+        },
+      });
+
+      const data = assertToolSuccess(result) as any;
+      expect(data.offset).toBe(2);
+      expect(data.returnedCount).toBe(2);
+      expect(data.totalCount).toBe(5);
+    });
+
+    it("returns empty results with totalCount 0 for empty history", async () => {
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history: [] }));
+
+      const result = await testClient.client.callTool({
+        name: "list_project_history",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(0);
+      expect(data.returnedCount).toBe(0);
+      expect(data.results).toHaveLength(0);
+    });
   });
 
   it("search_project_history matches expected fields and validates params", async () => {
