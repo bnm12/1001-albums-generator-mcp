@@ -9,7 +9,7 @@
   },
   "server": {
     "type": "node",
-    "entry_point": "dist/index.js",
+    "entry_point": "remote-shim/index.js",
     "mcp_config": {
       "command": "npx",
       "args": [

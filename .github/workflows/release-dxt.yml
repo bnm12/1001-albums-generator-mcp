@@ -2,13 +2,15 @@ name: Release DXT Extensions
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,7 +21,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build project
         run: npm run build
@@ -27,34 +29,34 @@ jobs:
       - name: Install DXT CLI
         run: npm install -g @anthropic-ai/dxt
 
+      - name: Get version
+        id: version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "tag=v${PKG_VERSION}-beta.${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "name=v${PKG_VERSION} beta (${SHORT_SHA})" >> $GITHUB_OUTPUT
+
       - name: Pack Local Extension
         run: dxt pack . 1001-albums-generator-mcp.dxt
 
       - name: Pack Remote Extension
         run: |
-          mv manifest.json manifest-local-temp.json
-          mv manifest-remote.json manifest.json
-          dxt pack . 1001-albums-generator-mcp-remote.dxt
-          mv manifest.json manifest-remote.json
-          mv manifest-local-temp.json manifest.json
+          mkdir -p /tmp/remote-dxt/remote-shim
+          cp manifest-remote.json /tmp/remote-dxt/manifest.json
+          cp remote-shim/index.js /tmp/remote-dxt/remote-shim/index.js
+          dxt pack /tmp/remote-dxt 1001-albums-generator-mcp-remote.dxt
 
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create Prerelease
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
           files: |
             1001-albums-generator-mcp.dxt
             1001-albums-generator-mcp-remote.dxt
           draft: false
-          prerelease: false
+          prerelease: true
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Artifacts
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: actions/upload-artifact@v4
-        with:
-          name: dxt-extensions
-          path: |
-            1001-albums-generator-mcp.dxt
-            1001-albums-generator-mcp-remote.dxt
