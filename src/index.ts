@@ -129,8 +129,8 @@ function createMcpServer() {
       albumIdentifier: z.string().describe('The album UUID, or album name to resolve against the book list'),
     },
     async ({ groupSlug, albumIdentifier }) => {
-      // Determine if albumIdentifier looks like a UUID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      // Determine if albumIdentifier looks like a UUID (MongoDB ObjectIDs)
+      const uuidRegex = /^[0-9a-f]{24}$/i;
       let albumUuid = albumIdentifier;
 
       if (!uuidRegex.test(albumIdentifier)) {
