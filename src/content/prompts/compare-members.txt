@@ -1,0 +1,10 @@
+Using the 1001 Albums tools, give me a detailed taste comparison between "${args.projectIdentifierA}" and "${args.projectIdentifierB}".
+
+Use get_group_member_comparison to get the full breakdown, then enrich it by fetching each member's taste profile using get_taste_profile.
+
+Cover:
+- Their overall taste similarity score and what it means in practice
+- Where they agree most — shared genres, decades, and albums they both rated highly
+- Where they diverge most — the albums they rated most differently, and what those disagreements reveal
+- Who is the harsher rater of the two, and whether that affects how you interpret divergences
+- A verdict: are these two musically compatible, or do they bring completely different sensibilities to the group?

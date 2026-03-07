@@ -1,0 +1,10 @@
+First, read the resource at info://1001-albums/about to understand how the generator works
+and why ratings — not listen counts — are the correct signal for taste analysis.
+
+Using the 1001 Albums tools, build a comprehensive profile of my music taste for project "${args.projectIdentifier}".
+
+Use get_taste_profile as the foundation, then enrich it with get_rating_outliers to identify where I diverge most from the community. I want to understand:
+- What genres, decades, and styles dominate my history
+- How I rate compared to the community — am I a generous or harsh rater, and do I tend to agree or disagree with the crowd?
+- Which albums I loved that others didn't, and which community favourites left me cold
+- What kind of listener I am overall — give me a short "listener archetype" summary at the end, like a music personality profile

@@ -1,0 +1,13 @@
+First, read the resource at info://1001-albums/tool-guide — specifically the recommended
+group workflow for "who agrees with whom" — before calling any tools.
+
+Using the 1001 Albums tools, analyse the taste compatibility across all members of group "${args.groupSlug}".
+
+Use get_group_compatibility_matrix to get the full pairwise similarity scores, then give me:
+- The most compatible pair in the group and what their shared taste looks like
+- The least compatible pair — the two members who disagree most
+- The most agreeable member (highest average similarity) and the group outlier (lowest average)
+- Any affinity clusters — sub-groups who seem to share a strong taste alignment
+- A short personality summary for the group as a whole: are you a cohesive group or a diverse one?
+
+Make it conversational and fun — this should feel like a music compatibility report, not a spreadsheet.

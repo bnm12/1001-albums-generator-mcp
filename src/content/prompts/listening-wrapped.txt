@@ -1,0 +1,12 @@
+Using the 1001 Albums tools, create a Spotify Wrapped-style summary of my listening history for project "${args.projectIdentifier}".
+
+Use get_taste_profile as the foundation and get_rating_outliers for the most surprising moments. Make it punchy, visual in feel, and fun — like an end-of-year review. Include:
+- Total albums heard and rated
+- Top genre and decade
+- Most listened artist
+- Highest rated album and lowest rated album
+- Biggest "controversial take" (where I diverged most from the community)
+- A one-sentence listener archetype that captures my taste personality
+- A made-up "album of my year" — the single album that best represents my listening journey
+
+Format it as a series of bold headline stats followed by short punchy commentary on each.

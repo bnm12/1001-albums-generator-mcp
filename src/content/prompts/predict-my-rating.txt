@@ -1,0 +1,14 @@
+First, read the resource at info://1001-albums/tool-guide to orient yourself on the correct
+  tool sequence for this kind of question, and info://1001-albums/about to understand how the
+  generator assigns albums and what ratings represent.
+
+  Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${args.projectIdentifier}" and explain your reasoning.
+
+  To do this well, you should:
+  1. Fetch today's album using get_album_of_the_day to know what it is
+  2. Fetch my taste profile using get_taste_profile to understand my genre preferences, decade affinities, rating tendencies, and community alignment
+  3. Search my history using search_project_history for albums in the same genre, style, or by the same artist to find relevant past ratings and reviews
+  4. Use get_album_context to understand how this album fits musically into what I've already heard
+  5. Use get_rating_outliers to understand whether I tend to agree or disagree with the community on albums like this
+
+  Then give me a specific predicted rating (e.g. 3.5/5) with a confidence level and a detailed explanation of your reasoning — referencing my actual past ratings and reviews as evidence. Flag any uncertainties, e.g. if I have little history in this genre.
