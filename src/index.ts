@@ -1072,36 +1072,33 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
 
   registerTool(
     'refresh_data',
-    'Force a refresh of cached data from the API. Use type "group" with a groupSlug to refresh a specific group\'s cached data.',
+    'Invalidates cached data. The next time the data is requested, it will be fetched fresh from the API. Use type "group" with a groupSlug or "project" with a projectIdentifier to refresh specific datasets.',
     {
       type: z.enum(['global', 'user', 'project', 'group', 'all']).describe('Type of data to refresh'),
       projectIdentifier: z.string().optional().describe('Required if type is "project"'),
       groupSlug: z.string().optional().describe('Required if type is "group"'),
     },
     async ({ type, projectIdentifier, groupSlug }) => {
-      // "global" clears the book list cache (/albums/stats)
-      // "user" clears the user-submitted albums cache (/user-albums/stats)
-      // "project" clears a specific project cache (/projects/:id)
       if (type === 'global') {
-        await client.getGlobalStats(true);
+        client.invalidateGlobalStats();
       } else if (type === 'user') {
-        await client.getUserAlbumStats(true);
+        client.invalidateUserStats();
       } else if (type === 'project') {
         if (!projectIdentifier) {
           throw new Error('projectIdentifier is required when type is "project"');
         }
-        await client.getProject(projectIdentifier, true);
+        client.invalidateProject(projectIdentifier);
       } else if (type === 'group') {
         if (!groupSlug) {
           throw new Error('groupSlug is required when type is "group"');
         }
-        await client.getGroup(groupSlug, true);
+        client.invalidateGroup(groupSlug);
       } else if (type === 'all') {
         client.clearCache();
       }
 
       return {
-        content: [{ type: 'text', text: `Successfully refreshed ${type} data.` }],
+        content: [{ type: 'text', text: `Successfully invalidated ${type} cache.` }],
       };
     }
   );

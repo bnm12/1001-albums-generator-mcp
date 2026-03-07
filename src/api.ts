@@ -215,40 +215,46 @@ export class AlbumsGeneratorClient {
 
     if (groupInfo.allTimeHighscore) {
       voteFetchers.push(
-        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeHighscore.album.uuid).then((reviews) => {
-          if (groupInfo.allTimeHighscore) {
-            groupInfo.allTimeHighscore.votes = reviews.reviews.map((r) => ({
-              projectIdentifier: r.projectIdentifier,
-              rating: r.rating,
-            }));
+        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeHighscore.album.uuid, forceRefresh).then(
+          (reviews) => {
+            if (groupInfo.allTimeHighscore) {
+              groupInfo.allTimeHighscore.votes = reviews.reviews.map((r) => ({
+                projectIdentifier: r.projectIdentifier,
+                rating: r.rating,
+              }));
+            }
           }
-        })
+        )
       );
     }
 
     if (groupInfo.allTimeLowscore) {
       voteFetchers.push(
-        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeLowscore.album.uuid).then((reviews) => {
-          if (groupInfo.allTimeLowscore) {
-            groupInfo.allTimeLowscore.votes = reviews.reviews.map((r) => ({
-              projectIdentifier: r.projectIdentifier,
-              rating: r.rating,
-            }));
+        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeLowscore.album.uuid, forceRefresh).then(
+          (reviews) => {
+            if (groupInfo.allTimeLowscore) {
+              groupInfo.allTimeLowscore.votes = reviews.reviews.map((r) => ({
+                projectIdentifier: r.projectIdentifier,
+                rating: r.rating,
+              }));
+            }
           }
-        })
+        )
       );
     }
 
     if (groupInfo.latestAlbumWithVotes) {
       voteFetchers.push(
-        this.getGroupAlbumReviews(groupSlug, groupInfo.latestAlbumWithVotes.album.uuid).then((reviews) => {
-          if (groupInfo.latestAlbumWithVotes) {
-            groupInfo.latestAlbumWithVotes.votes = reviews.reviews.map((r) => ({
-              projectIdentifier: r.projectIdentifier,
-              rating: r.rating,
-            }));
+        this.getGroupAlbumReviews(groupSlug, groupInfo.latestAlbumWithVotes.album.uuid, forceRefresh).then(
+          (reviews) => {
+            if (groupInfo.latestAlbumWithVotes) {
+              groupInfo.latestAlbumWithVotes.votes = reviews.reviews.map((r) => ({
+                projectIdentifier: r.projectIdentifier,
+                rating: r.rating,
+              }));
+            }
           }
-        })
+        )
       );
     }
 
@@ -299,6 +305,28 @@ export class AlbumsGeneratorClient {
       timestamp: Date.now(),
     });
     return albumReviews;
+  }
+
+  invalidateGlobalStats() {
+    this.globalStatsCache = null;
+  }
+
+  invalidateUserStats() {
+    this.userStatsCache = null;
+  }
+
+  invalidateProject(projectIdentifier: string) {
+    this.projectsCache.delete(projectIdentifier);
+  }
+
+  invalidateGroup(groupSlug: string) {
+    this.groupsCache.delete(groupSlug);
+    // Also invalidate any associated album reviews for this group
+    for (const key of this.groupAlbumReviewsCache.keys()) {
+      if (key.startsWith(`${groupSlug}:`)) {
+        this.groupAlbumReviewsCache.delete(key);
+      }
+    }
   }
 
   clearCache() {
