@@ -1,9 +1,11 @@
+import axios, { AxiosError } from "axios";
 import { describe, expect, it } from "vitest";
 import {
   calculateProjectStats,
   computeCompatibilityMatrix,
   computePairSimilarity,
   computeRatingTendencies,
+  formatApiError,
   frequencyMap,
   getDecade,
   getRatedEntries,
@@ -299,5 +301,87 @@ describe("helpers", () => {
     if (typeof ws === "object") {
       expect(ws.response.content[0].text).toContain("group name in lowercase with hyphens");
     }
+  });
+});
+
+
+describe("formatApiError", () => {
+  function makeAxiosError(status: number | null, message = "Request failed"): AxiosError {
+    const error = new AxiosError(message);
+    if (status !== null) {
+      error.response = {
+        status,
+        statusText: String(status),
+        data: {},
+        headers: {},
+        config: error.config ?? ({} as never),
+      };
+    }
+    return error;
+  }
+
+  it("maps 404 responses to not_found with context", () => {
+    const result = formatApiError(makeAxiosError(404), 'Project "foo"');
+    expect(result.type).toBe("not_found");
+    expect(result.statusCode).toBe(404);
+    expect(result.message).toContain("foo");
+    expect(result.message).toContain("404");
+  });
+
+  it("maps 429 responses to rate_limited", () => {
+    const result = formatApiError(makeAxiosError(429), "Project");
+    expect(result.type).toBe("rate_limited");
+    expect(result.statusCode).toBe(429);
+    expect(result.message.toLowerCase()).toContain("rate limit");
+  });
+
+  it("maps 500 responses to upstream_error", () => {
+    const result = formatApiError(makeAxiosError(500), "Project");
+    expect(result.type).toBe("upstream_error");
+    expect(result.statusCode).toBe(500);
+    expect(result.message).toContain("500");
+  });
+
+  it("maps 503 responses to upstream_error", () => {
+    const result = formatApiError(makeAxiosError(503), "Project");
+    expect(result.type).toBe("upstream_error");
+    expect(result.statusCode).toBe(503);
+  });
+
+  it("maps axios errors without response to network_error", () => {
+    const result = formatApiError(makeAxiosError(null, "Network Error"), "Project");
+    expect(result.type).toBe("network_error");
+    expect(result.statusCode).toBeNull();
+    expect(result.message).toContain("Network Error");
+  });
+
+  it("maps other HTTP errors to unexpected", () => {
+    const result = formatApiError(makeAxiosError(400), "Project");
+    expect(result.type).toBe("unexpected");
+    expect(result.statusCode).toBe(400);
+  });
+
+  it("maps non-axios Error instances to unexpected", () => {
+    const result = formatApiError(new Error("something exploded"), "anything");
+    expect(result.type).toBe("unexpected");
+    expect(result.statusCode).toBeNull();
+    expect(result.message).toContain("something exploded");
+  });
+
+  it("maps unknown thrown values to unexpected", () => {
+    const result = formatApiError("oops", "anything");
+    expect(result.type).toBe("unexpected");
+    expect(result.statusCode).toBeNull();
+    expect(result.message).toContain("oops");
+  });
+
+  it("interpolates context into 404 message", () => {
+    const result = formatApiError(makeAxiosError(404), 'Group "test-group"');
+    expect(result.message).toContain("test-group");
+  });
+
+  it("treats axios-like errors from axios constructor as axios errors", () => {
+    const e = new AxiosError("Network Error");
+    expect(axios.isAxiosError(e)).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { formatApiError } from "../helpers.js";
 import { z } from "zod";
 
 export function makeRegisterTool(server: McpServer) {
@@ -17,7 +18,15 @@ export function makeRegisterTool(server: McpServer) {
         return result;
       } catch (error) {
         console.error(`[Tool Error] ${name}`, error);
-        throw error;
+        const errInfo = formatApiError(error, name);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${errInfo.message}`,
+            },
+          ],
+        };
       }
     };
 

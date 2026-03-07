@@ -1,4 +1,16 @@
+import axios from "axios";
 import { UserAlbumHistoryEntry } from "./api.js";
+
+export interface ApiErrorInfo {
+  type:
+    | "not_found"
+    | "rate_limited"
+    | "upstream_error"
+    | "network_error"
+    | "unexpected";
+  statusCode: number | null;
+  message: string;
+}
 
 export interface PairSimilarity {
   memberA: string;
@@ -244,4 +256,56 @@ export function requireParam(
     };
   }
   return value.trim();
+}
+
+export function formatApiError(error: unknown, context: string): ApiErrorInfo {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status ?? null;
+
+    if (status === 404) {
+      return {
+        type: "not_found",
+        statusCode: 404,
+        message: `${context} was not found (404). Check that the identifier is correct.`,
+      };
+    }
+
+    if (status === 429) {
+      return {
+        type: "rate_limited",
+        statusCode: 429,
+        message:
+          "The upstream API rate limit was reached. Wait a moment and try again.",
+      };
+    }
+
+    if (status !== null && status >= 500) {
+      return {
+        type: "upstream_error",
+        statusCode: status,
+        message: `The 1001 Albums Generator API returned an error (${status}). The service may be temporarily unavailable. Try again shortly.`,
+      };
+    }
+
+    if (!error.response) {
+      return {
+        type: "network_error",
+        statusCode: null,
+        message: `Could not reach the 1001 Albums Generator API. Check your network connection and try again. (${error.message})`,
+      };
+    }
+
+    return {
+      type: "unexpected",
+      statusCode: status,
+      message: `Unexpected API response (${status ?? "unknown"}): ${error.message}`,
+    };
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    type: "unexpected",
+    statusCode: null,
+    message: `An unexpected error occurred: ${message}`,
+  };
 }

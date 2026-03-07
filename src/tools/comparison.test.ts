@@ -1,5 +1,11 @@
+import { AxiosError } from "axios";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertToolError, assertToolSuccess } from "../test/assertions.js";
+import {
+  assertToolError,
+  assertToolSuccess,
+  getToolResponseText,
+  makeAxiosError,
+} from "../test/assertions.js";
 import { createTestClient, type TestClient } from "../test/create-test-client.js";
 import type { ProjectInfo } from "../api.js";
 import { makeAlbum, makeGroupInfo, makeGroupMember, makeHistoryEntry, makeProjectInfo } from "../test/fixtures.js";
@@ -243,4 +249,80 @@ describe("comparison tools", () => {
     assertToolError(await testClient.client.callTool({ name: "compare_projects", arguments: { projectIdentifierA: "", projectIdentifierB: "b" } }), "projectIdentifierA");
     assertToolError(await testClient.client.callTool({ name: "compare_projects", arguments: { projectIdentifierA: "a", projectIdentifierB: "" } }), "projectIdentifierB");
   });
+
+  describe("API error handling", () => {
+    it("get_group_album_insights returns structured error when group is missing", async () => {
+      mockClient.getGroup.mockRejectedValue(makeAxiosError(404));
+      const result = await testClient.client.callTool({
+        name: "get_group_album_insights",
+        arguments: { groupSlug: "missing" },
+      });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("get_group_album_insights returns structured error when one member project fails", async () => {
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({ members: [makeGroupMember("alice"), makeGroupMember("carol")] }),
+      );
+      mockClient.getProject.mockImplementation(async (id: string) => {
+        if (id === "carol") throw makeAxiosError(500);
+        return makeProjectInfo({ name: id });
+      });
+
+      const result = await testClient.client.callTool({
+        name: "get_group_album_insights",
+        arguments: { groupSlug: "g1" },
+      });
+      const text = getToolResponseText(result);
+      expect(text).toContain("Error:");
+      expect(text).toContain("500");
+    });
+
+    it("get_group_member_comparison returns structured error when one project fetch fails", async () => {
+      mockClient.getProject.mockImplementation(async (id: string) => {
+        if (id === "a") throw makeAxiosError(500);
+        return makeProjectInfo({ name: id });
+      });
+      const result = await testClient.client.callTool({
+        name: "get_group_member_comparison",
+        arguments: { projectIdentifierA: "a", projectIdentifierB: "b" },
+      });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("compare_projects returns structured error on network failure", async () => {
+      mockClient.getProject.mockRejectedValue(new AxiosError("Network Error"));
+      const result = await testClient.client.callTool({
+        name: "compare_projects",
+        arguments: { projectIdentifierA: "a", projectIdentifierB: "b" },
+      });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("get_group_compatibility_matrix returns structured error when group is missing", async () => {
+      mockClient.getGroup.mockRejectedValue(makeAxiosError(404));
+      const result = await testClient.client.callTool({
+        name: "get_group_compatibility_matrix",
+        arguments: { groupSlug: "missing" },
+      });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("get_group_compatibility_matrix returns structured error when one project fails", async () => {
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({ members: [makeGroupMember("alice"), makeGroupMember("carol")] }),
+      );
+      mockClient.getProject.mockImplementation(async (id: string) => {
+        if (id === "carol") throw makeAxiosError(500);
+        return makeProjectInfo({ name: id });
+      });
+
+      const result = await testClient.client.callTool({
+        name: "get_group_compatibility_matrix",
+        arguments: { groupSlug: "g1" },
+      });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+  });
+
 });

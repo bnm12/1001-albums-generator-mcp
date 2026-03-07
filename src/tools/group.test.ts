@@ -1,5 +1,11 @@
+import { AxiosError } from "axios";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertToolError, assertToolSuccess } from "../test/assertions.js";
+import {
+  assertToolError,
+  assertToolSuccess,
+  getToolResponseText,
+  makeAxiosError,
+} from "../test/assertions.js";
 import { createTestClient, type TestClient } from "../test/create-test-client.js";
 import { makeAlbum, makeGroupInfo } from "../test/fixtures.js";
 import { makeMockClient } from "../test/mock-client.js";
@@ -97,4 +103,55 @@ describe("group tools", () => {
     assertToolError(await testClient.client.callTool({ name: "refresh_data", arguments: { type: "project", projectIdentifier: "" } }), "projectIdentifier");
     assertToolError(await testClient.client.callTool({ name: "refresh_data", arguments: { type: "group", groupSlug: "" } }), "groupSlug");
   });
+
+  describe("API error handling", () => {
+    it("get_group returns structured error for 404", async () => {
+      mockClient.getGroup.mockRejectedValue(makeAxiosError(404));
+      const result = await testClient.client.callTool({ name: "get_group", arguments: { groupSlug: "missing" } });
+      const text = getToolResponseText(result);
+      expect(text).toContain("Error:");
+      expect(text).toContain("404");
+    });
+
+    it("get_group returns structured error for 500", async () => {
+      mockClient.getGroup.mockRejectedValue(makeAxiosError(500));
+      const result = await testClient.client.callTool({ name: "get_group", arguments: { groupSlug: "g1" } });
+      const text = getToolResponseText(result);
+      expect(text).toContain("Error:");
+      expect(text).toContain("500");
+    });
+
+    it("get_group_latest_album returns structured error on network failure", async () => {
+      mockClient.getGroup.mockRejectedValue(new AxiosError("Network Error"));
+      const result = await testClient.client.callTool({ name: "get_group_latest_album", arguments: { groupSlug: "g1" } });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("get_group_album_reviews returns structured error when group is missing", async () => {
+      mockClient.getGroup.mockRejectedValue(makeAxiosError(404));
+      const result = await testClient.client.callTool({
+        name: "get_group_album_reviews",
+        arguments: { groupSlug: "missing", albumIdentifier: "album" },
+      });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("get_group_album_reviews returns structured error when reviews endpoint fails", async () => {
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({
+          latestAlbumWithVotes: {
+            album: makeAlbum({ uuid: "aaaaaaaaaaaaaaaaaaaaaaaa", name: "album" }),
+            votes: [],
+          },
+        }),
+      );
+      mockClient.getGroupAlbumReviews.mockRejectedValue(makeAxiosError(404));
+      const result = await testClient.client.callTool({
+        name: "get_group_album_reviews",
+        arguments: { groupSlug: "g1", albumIdentifier: "aaaaaaaaaaaaaaaaaaaaaaaa" },
+      });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+  });
+
 });

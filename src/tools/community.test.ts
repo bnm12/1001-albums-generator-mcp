@@ -1,5 +1,11 @@
+import { AxiosError } from "axios";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertToolError, assertToolSuccess } from "../test/assertions.js";
+import {
+  assertToolError,
+  assertToolSuccess,
+  getToolResponseText,
+  makeAxiosError,
+} from "../test/assertions.js";
 import { createTestClient, type TestClient } from "../test/create-test-client.js";
 import { makeAlbumStat } from "../test/fixtures.js";
 import { makeMockClient } from "../test/mock-client.js";
@@ -57,4 +63,25 @@ describe("community tools", () => {
     ]);
     expect(mockClient.getUserAlbumStats).toHaveBeenCalledTimes(1);
   });
+
+  describe("API error handling", () => {
+    it("list_book_album_stats returns structured error on 500", async () => {
+      mockClient.getGlobalStats.mockRejectedValue(makeAxiosError(500));
+      const result = await testClient.client.callTool({ name: "list_book_album_stats", arguments: {} });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("list_book_album_stats returns structured error on network failure", async () => {
+      mockClient.getGlobalStats.mockRejectedValue(new AxiosError("Network Error"));
+      const result = await testClient.client.callTool({ name: "list_book_album_stats", arguments: {} });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+
+    it("list_user_submitted_album_stats returns structured error on 500", async () => {
+      mockClient.getUserAlbumStats.mockRejectedValue(makeAxiosError(500));
+      const result = await testClient.client.callTool({ name: "list_user_submitted_album_stats", arguments: {} });
+      expect(getToolResponseText(result)).toContain("Error:");
+    });
+  });
+
 });

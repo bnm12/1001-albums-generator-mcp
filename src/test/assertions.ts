@@ -1,3 +1,4 @@
+import { AxiosError } from "axios";
 import { expect } from "vitest";
 
 interface ToolResponse {
@@ -30,4 +31,21 @@ export function assertToolError(result: unknown, expectedSubstring: string): voi
 
 export function assertToolSuccess(result: unknown): unknown {
   return parseToolResult(result);
+}
+
+export function getToolResponseText(result: unknown): string {
+  const response = result as ToolResponse;
+  return response.content[0]?.text ?? "";
+}
+
+export function makeAxiosError(status: number): AxiosError {
+  const error = new AxiosError(`Request failed with status ${status}`);
+  error.response = {
+    status,
+    statusText: String(status),
+    data: {},
+    headers: {},
+    config: error.config ?? ({} as never),
+  };
+  return error;
 }

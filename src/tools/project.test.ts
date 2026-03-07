@@ -1,5 +1,11 @@
+import { AxiosError } from "axios";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertToolError, assertToolSuccess } from "../test/assertions.js";
+import {
+  assertToolError,
+  assertToolSuccess,
+  getToolResponseText,
+  makeAxiosError,
+} from "../test/assertions.js";
 import { createTestClient, type TestClient } from "../test/create-test-client.js";
 import { makeAlbum, makeHistoryEntry, makeProjectInfo } from "../test/fixtures.js";
 import { makeMockClient } from "../test/mock-client.js";
@@ -157,4 +163,48 @@ describe("project tools", () => {
     const notFound = await testClient.client.callTool({ name: "get_album_context", arguments: { projectIdentifier: "p1", albumIdentifier: "not-found" } });
     assertToolError(notFound, "not found");
   });
+
+  describe("API error handling", () => {
+    it("returns structured error when project not found (404)", async () => {
+      mockClient.getProject.mockRejectedValue(makeAxiosError(404));
+      const result = await testClient.client.callTool({
+        name: "get_album_of_the_day",
+        arguments: { projectIdentifier: "nonexistent" },
+      });
+      const text = getToolResponseText(result);
+      expect(text).toContain("Error:");
+      expect(text).toContain("404");
+    });
+
+    it("returns structured error on network failure", async () => {
+      mockClient.getProject.mockRejectedValue(new AxiosError("Network Error"));
+      const result = await testClient.client.callTool({
+        name: "get_album_of_the_day",
+        arguments: { projectIdentifier: "my-project" },
+      });
+      const text = getToolResponseText(result);
+      expect(text).toContain("Error:");
+    });
+
+    it("returns structured error on upstream 500", async () => {
+      mockClient.getProject.mockRejectedValue(makeAxiosError(500));
+      const result = await testClient.client.callTool({
+        name: "get_project_stats",
+        arguments: { projectIdentifier: "my-project" },
+      });
+      const text = getToolResponseText(result);
+      expect(text).toContain("Error:");
+      expect(text).toContain("500");
+    });
+
+    it("never throws — always returns a content response", async () => {
+      mockClient.getProject.mockRejectedValue(new Error("unexpected internal error"));
+      const result = await testClient.client.callTool({
+        name: "get_project_stats",
+        arguments: { projectIdentifier: "my-project" },
+      });
+      expect(result).toHaveProperty("content");
+    });
+  });
+
 });
