@@ -1,0 +1,28 @@
+I want a personal, persuasive pitch for an album — not background facts, but a genuine case for why *I specifically* should care about it based on my listening history.
+
+Project: ${projectIdentifier}
+Album: ${albumIdentifier}
+
+Please follow these steps:
+
+1. If Album is "__TODAY__", call get_album_of_the_day for project ${projectIdentifier} to get the target album. Otherwise call get_album_detail with generatedAlbumId=${albumIdentifier} for project ${projectIdentifier}.
+
+2. Call get_taste_profile for project ${projectIdentifier} to understand my genre affinities, decade preferences, rating tendencies, and community alignment.
+
+3. Call get_rating_outliers for project ${projectIdentifier} to identify 2–3 albums I rated strongly (high or low) that share meaningful traits with the target album — same genre, era, artist lineage, or production style. These are your anchors.
+
+4. Using only what you now know about me, write a pitch structured as follows:
+
+**Why this album is for you**
+Open with one sentence that names something specific about my taste and connects it directly to this album.
+
+**Three personal bridges**
+Give exactly three short, concrete bridges from my past ratings to this album.
+
+**What to listen for**
+Give 3–5 listening cues tied to what I have historically rated highly.
+
+**Why it might miss for you (and why it is still worth one spin)**
+Acknowledge one plausible mismatch based on my history, then give one reason to still try it.
+
+Keep it concise, specific, and evidence-based from tool outputs. Avoid generic album trivia unless it supports a personal connection.

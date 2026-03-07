@@ -56,6 +56,7 @@ Identify the album by name, UUID, or \`generatedAlbumId\` from \`list_project_hi
 | Am I a harsh or generous rater? | \`get_taste_profile\` (ratingTendencies) |
 | Do I agree or disagree with the community? | \`get_taste_profile\` (communityAlignment) |
 | Which albums did I rate very differently from the community? | \`get_rating_outliers\` |
+| How has my taste evolved over time in distinct phases? | \`get_listening_arc\` |
 | What does this user value/dislike in a specific genre or with a specific artist? | \`get_review_insights\` (query pattern) |
 | What qualitative context exists for predicting today's album rating? | \`get_review_insights\` (albumIdentifier pattern) |
 | How has my genre exposure evolved over time? | \`list_project_history\` sorted by generatedAt, then analyse |
@@ -93,6 +94,13 @@ user rated. `get_review_insights` tells you *why* — which is often more predic
 - "Why does this user rate experimental music so variably?" →
   `get_review_insights({ query: "Experimental" })` then compare with
   `get_rating_outliers` to see if high-divergence albums cluster in that genre
+
+
+**Recommended workflow for listening-story questions:**
+
+1. `get_listening_arc` → get pre-segmented phases, rolling trends, and milestones
+2. `get_taste_profile` → anchor the current-state snapshot (genres, decades, tendencies)
+3. Use the `arc_segments` + `milestones` chronologically as chapter beats; narrate from the payload rather than recomputing statistics from raw history.
 
 ---
 

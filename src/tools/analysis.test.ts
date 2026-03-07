@@ -94,6 +94,130 @@ describe("analysis tools", () => {
     assertToolError(await testClient.client.callTool({ name: "get_rating_outliers", arguments: { projectIdentifier: "" } }), "projectIdentifier");
   });
 
+
+  describe("get_listening_arc", () => {
+    function makeArcHistory(count: number, opts: { includeUnrated?: boolean; sameGenre?: boolean; noGlobal?: boolean } = {}) {
+      const history = Array.from({ length: count }, (_, i) => {
+        const year = 2018 + Math.floor(i / 12);
+        const month = (i % 12) + 1;
+        const genre = opts.sameGenre ? "Rock" : i % 3 === 0 ? "Rock" : i % 3 === 1 ? "Jazz" : "Electronic";
+        const rating = opts.includeUnrated && i % 11 === 0 ? null : (i % 5) + 1;
+        return makeHistoryEntry({
+          generatedAlbumId: `arc-${i + 1}`,
+          generatedAt: `${year}-${String(month).padStart(2, "0")}-01T00:00:00.000Z`,
+          album: makeAlbum({
+            uuid: `arc-u-${i + 1}`,
+            name: `Arc Album ${i + 1}`,
+            artist: `Artist ${i % 7}`,
+            genres: [genre],
+            releaseDate: `${1970 + (i % 40)}`,
+          }),
+          rating,
+          globalRating: opts.noGlobal ? undefined : 3 + ((i % 4) * 0.2),
+        });
+      });
+      return makeProjectInfo({ history });
+    }
+
+    it("builds year-based segments for long histories", async () => {
+      mockClient.getProject.mockResolvedValue(makeArcHistory(72));
+
+      const result = await testClient.client.callTool({
+        name: "get_listening_arc",
+        arguments: { projectIdentifier: "p1" },
+      });
+
+      const data = assertToolSuccess(result) as {
+        metadata: { too_short_for_arc: boolean; window: string };
+        arc_segments: Array<{ label: string }>;
+        milestones: Array<{ type: string }>;
+        trend_data: { rating_rolling_avg: unknown[] };
+      };
+
+      expect(data.metadata.too_short_for_arc).toBe(false);
+      expect(data.metadata.window).toBe("full");
+      expect(data.arc_segments.every((s) => s.label.startsWith("Year "))).toBe(true);
+      expect(data.trend_data.rating_rolling_avg.length).toBeGreaterThan(0);
+      expect(data.milestones.some((m) => m.type === "first_five_star")).toBe(true);
+      expect(data.milestones.some((m) => m.type === "rating_peak")).toBe(true);
+      expect(data.milestones.some((m) => m.type === "rating_trough")).toBe(true);
+    });
+
+    it("returns a single segment and too_short_for_arc for short histories", async () => {
+      mockClient.getProject.mockResolvedValue(makeArcHistory(8));
+      const result = await testClient.client.callTool({
+        name: "get_listening_arc",
+        arguments: { projectIdentifier: "p1" },
+      });
+      const data = assertToolSuccess(result) as {
+        metadata: { too_short_for_arc: boolean };
+        arc_segments: unknown[];
+      };
+      expect(data.metadata.too_short_for_arc).toBe(true);
+      expect(data.arc_segments.length).toBe(1);
+    });
+
+    it("honours recent hint by capping to last 30 albums", async () => {
+      mockClient.getProject.mockResolvedValue(makeArcHistory(80));
+      const result = await testClient.client.callTool({
+        name: "get_listening_arc",
+        arguments: { projectIdentifier: "p1", hint: "recent" },
+      });
+      const data = assertToolSuccess(result) as { metadata: { total_albums: number; window: string } };
+      expect(data.metadata.window).toBe("recent");
+      expect(data.metadata.total_albums).toBe(30);
+    });
+
+    it("returns an error for empty projectIdentifier", async () => {
+      const result = await testClient.client.callTool({
+        name: "get_listening_arc",
+        arguments: { projectIdentifier: "" },
+      });
+      assertToolError(result, "projectIdentifier");
+    });
+
+    it("keeps unrated albums in segments but excludes them from rolling averages", async () => {
+      mockClient.getProject.mockResolvedValue(makeArcHistory(30, { includeUnrated: true }));
+      const result = await testClient.client.callTool({
+        name: "get_listening_arc",
+        arguments: { projectIdentifier: "p1", hint: "recent" },
+      });
+      const data = assertToolSuccess(result) as {
+        metadata: { total_albums: number; rated_albums: number };
+        arc_segments: Array<{ album_count: number; rated_count: number }>;
+      };
+      const segmentTotal = data.arc_segments.reduce((sum, seg) => sum + seg.album_count, 0);
+      const segmentRated = data.arc_segments.reduce((sum, seg) => sum + seg.rated_count, 0);
+      expect(segmentTotal).toBe(data.metadata.total_albums);
+      expect(segmentRated).toBe(data.metadata.rated_albums);
+      expect(data.metadata.rated_albums).toBeLessThan(data.metadata.total_albums);
+    });
+
+    it("returns null community deltas and empty alignment trend when global ratings are missing", async () => {
+      mockClient.getProject.mockResolvedValue(makeArcHistory(25, { noGlobal: true }));
+      const result = await testClient.client.callTool({
+        name: "get_listening_arc",
+        arguments: { projectIdentifier: "p1" },
+      });
+      const data = assertToolSuccess(result) as {
+        arc_segments: Array<{ avg_community_delta: number | null }>;
+        trend_data: { community_alignment: unknown[] };
+      };
+      expect(data.arc_segments.every((s) => s.avg_community_delta === null)).toBe(true);
+      expect(data.trend_data.community_alignment.length).toBe(0);
+    });
+
+    it("keeps top_genres stable when all albums share same genre", async () => {
+      mockClient.getProject.mockResolvedValue(makeArcHistory(30, { sameGenre: true }));
+      const result = await testClient.client.callTool({
+        name: "get_listening_arc",
+        arguments: { projectIdentifier: "p1", hint: "recent" },
+      });
+      const data = assertToolSuccess(result) as { arc_segments: Array<{ top_genres: string[] }> };
+      expect(data.arc_segments.every((s) => s.top_genres[0] === "Rock")).toBe(true);
+    });
+  });
+
   describe("API error handling", () => {
     it("get_taste_profile returns structured error on 404", async () => {
       mockClient.getProject.mockRejectedValue(makeAxiosError(404));
