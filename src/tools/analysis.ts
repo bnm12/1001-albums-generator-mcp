@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { AlbumsGeneratorClient } from "../api.js";
 import {
+  buildReviewInsightsContext,
   computeRatingTendencies,
   getDecade,
   getRatedEntries,
@@ -126,4 +127,209 @@ Combine with get_taste_profile to contextualise whether this user is generally c
     },
     true,
   );
+
+  registerTool(
+    "get_review_insights",
+    `Synthesises qualitative insight from a user's written album reviews using MCP Sampling.
+Where rating-based tools give you numbers, this tool gives you reasoning — what the user
+actually says about what they value, dislike, and notice in music.
+
+Use this tool when:
+- Predicting how a user will respond to a specific album (pass albumIdentifier)
+- Understanding what a user thinks of a particular artist, genre, or style (pass query)
+- Building a richer taste profile than ratings alone can provide
+
+HOW IT WORKS: The tool fetches the project history (no extra API calls — uses cached
+data), filters to entries with written reviews that match the query or album context,
+prioritises reviews where the user diverged most from the community (these tend to be the
+most informationally dense), then uses MCP Sampling to ask the connected LLM to synthesise
+those reviews into a concise qualitative insight. The synthesis is done by the LLM, not
+by an algorithm, because LLMs are far better at extracting nuanced reasoning from text.
+
+TWO CALL PATTERNS:
+
+1. ALBUM-ANCHORED — pass albumIdentifier (name, UUID, or generatedAlbumId):
+   Reviews are filtered to entries sharing genre, style, or artist with that album.
+   Best for: "How will this user respond to today's album?"
+   Example: get_review_insights({ projectIdentifier: "x", albumIdentifier: "Kind of Blue" })
+
+2. OPEN QUERY — pass query (freetext string):
+   Reviews are filtered by matching artist name, album name, genre, or style.
+   Best for: "What does this user think of David Bowie / jazz / experimental music?"
+   Example: get_review_insights({ projectIdentifier: "x", query: "David Bowie" })
+
+If neither albumIdentifier nor query is provided, the tool synthesises across the user's
+most opinionated reviews overall (highest divergence from community).
+
+PARAMETERS:
+- projectIdentifier: required
+- albumIdentifier: optional — name, UUID, or generatedAlbumId from list_project_history
+- query: optional — freetext matched against artist, album name, genre, or style
+- limit: optional (default 15, max 30) — max reviews fed to sampling. Higher values give
+  richer synthesis but increase sampling token usage. Reviews are prioritised by community
+  divergence before the limit is applied, so the most informative reviews are always
+  included first.
+
+REQUIRES SAMPLING: This tool uses MCP Sampling to synthesise reviews. If the connected
+client does not support sampling, a fallback response is returned containing the raw
+review entries instead of a synthesis — still useful, but less concise.
+
+Returns a qualitative synthesis as plain text, plus metadata (how many reviews were found,
+how many were used, whether results were capped).`,
+    {
+      projectIdentifier: z.string().describe("The name of the project or the sharerId"),
+      albumIdentifier: z.string().optional().describe(
+        "Album name, UUID, or generatedAlbumId to anchor the review search by genre/style/artist connections",
+      ),
+      query: z.string().optional().describe(
+        "Freetext query matched against artist name, album name, genre, or style",
+      ),
+      limit: z.number().int().min(1).max(30).default(15).describe(
+        "Maximum number of reviews to synthesise (default 15). Reviews are prioritised by community divergence before this limit is applied.",
+      ),
+    },
+    async ({ projectIdentifier, albumIdentifier, query, limit }) => {
+      const pid = requireParam(projectIdentifier, "projectIdentifier");
+      if (typeof pid === "object" && "error" in pid) return pid.response;
+
+      const project = await client.getProject(pid);
+
+      const context = buildReviewInsightsContext(
+        project.history,
+        query,
+        albumIdentifier,
+        limit,
+      );
+
+      if (context.selectedReviews.length === 0) {
+        const reason =
+          albumIdentifier || query
+            ? `No reviewed entries found matching "${albumIdentifier ?? query}".`
+            : "No reviewed entries found in this project's history.";
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              synthesis: null,
+              reason,
+              metadata: {
+                totalReviewedEntries: context.totalReviewedEntries,
+                matchingEntries: 0,
+                reviewsUsed: 0,
+                wasCapped: false,
+                samplingUsed: false,
+              },
+            }, null, 2),
+          }],
+        };
+      }
+
+      const reviewBlock = context.selectedReviews
+        .map(
+          (r) =>
+            `---\nAlbum: ${r.albumName} by ${r.artist} (${r.releaseDate})\n` +
+            `Genres: ${r.genres.join(", ")}${r.styles.length > 0 ? `\nStyles: ${r.styles.join(", ")}` : ""}\n` +
+            `User rating: ${r.userRating}/5${r.globalRating !== null ? ` (community: ${r.globalRating}/5)` : ""}\n` +
+            `Review: ${r.review}`,
+        )
+        .join("\n\n");
+
+      let contextLine: string;
+      let targetAlbumName: string | undefined;
+      if (albumIdentifier) {
+        const lowerIdentifier = albumIdentifier.toLowerCase();
+        const targetEntry = project.history.find(
+          (h) =>
+            h.album.name.toLowerCase() === lowerIdentifier ||
+            h.album.uuid === albumIdentifier ||
+            h.generatedAlbumId === albumIdentifier,
+        );
+        targetAlbumName = targetEntry?.album.name ?? albumIdentifier;
+        contextLine = `Context: these reviews were selected because they share genre, style, or artist connections with the album "${targetAlbumName}".`;
+      } else if (query) {
+        contextLine = `Context: these reviews were selected by searching for "${query}".`;
+      } else {
+        contextLine = "Context: these are the listener's most opinionated reviews (highest divergence from community consensus).";
+      }
+
+      const cappedNote = context.wasCapped
+        ? ` (showing top ${limit} by community divergence)`
+        : "";
+
+      const userMessageText =
+        `${contextLine}\n\n` +
+        `Here are ${context.selectedReviews.length} reviews from this listener's history${cappedNote}:\n\n` +
+        `${reviewBlock}\n\n` +
+        "Synthesise these into a concise qualitative insight about this listener's taste in the relevant area. " +
+        "Focus on what the reviews reveal about their preferences and reasoning, not just what they liked or disliked numerically.";
+
+      const systemPrompt =
+        "You are a music taste analyst. You have been given a set of album reviews written by a single listener. " +
+        "Your job is to synthesise these reviews into a concise qualitative insight that will help predict how " +
+        "this listener will respond to new music.\n\n" +
+        "Focus on:\n" +
+        "- What qualities, sounds, or characteristics the listener explicitly values or praises\n" +
+        "- What they dislike, find tedious, or criticise — be specific, not generic\n" +
+        "- Any patterns in what makes them rate something higher or lower than the community\n" +
+        "- Contradictions or nuances (e.g. \"loves jazz but dislikes free jazz\")\n" +
+        "- The listener's own language and framing where it reveals taste clearly\n\n" +
+        "Do NOT:\n" +
+        "- Summarise each album individually — synthesise across all of them\n" +
+        "- Repeat the ratings — the insight is about reasoning, not scores\n" +
+        "- Make generic statements like \"the listener enjoys good music\" that carry no signal\n" +
+        "- Exceed 250 words\n\n" +
+        "Return only the insight text. No preamble, no headings, no bullet points unless the insight genuinely requires them to be clear.";
+
+      const samplingPromptText = `${systemPrompt}\n\n${userMessageText}`;
+
+      let synthesis: string;
+      let samplingUsed: boolean;
+
+      try {
+        const samplingResponse = await server.server.createMessage({
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: samplingPromptText,
+              },
+            },
+          ],
+          maxTokens: 600,
+        });
+
+        synthesis =
+          samplingResponse.content.type === "text"
+            ? samplingResponse.content.text
+            : "Sampling returned a non-text response.";
+        samplingUsed = true;
+      } catch (samplingError) {
+        console.error("[get_review_insights] Sampling unavailable or failed:", samplingError);
+
+        synthesis =
+          "Sampling is not available with the current client. " +
+          `Here are the ${context.selectedReviews.length} most relevant reviews for you to interpret directly:\n\n` +
+          reviewBlock;
+        samplingUsed = false;
+      }
+
+      const result = {
+        synthesis,
+        metadata: {
+          totalReviewedEntries: context.totalReviewedEntries,
+          matchingEntries: context.matchingEntries,
+          reviewsUsed: context.selectedReviews.length,
+          wasCapped: context.wasCapped,
+          samplingUsed,
+        },
+      };
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+    true,
+  );
+
 }
