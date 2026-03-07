@@ -60,7 +60,12 @@ ratings, no reviews, no history. They are community-wide aggregates only.
 | `search_project_history` | Project | Searching a user's history by name, artist, year, or genre |
 | `get_album_detail` | Project | Full detail for one album: review, streaming links, metadata |
 | `get_album_of_the_day` | Project | The album currently assigned to a project |
-| `get_album_context` | Project | Relationships between one album and others in the history |
+| `get_album_context` | Project | Rich contextual data: artist arc, connections, divergence |
+| `get_taste_profile` | Project | Overall taste summary for a single user |
+| `get_rating_outliers` | Project | Albums where user most diverges from community |
+| `get_group_album_insights` | Project (multiple) | Most divisive/consensus albums across a group |
+| `get_group_member_comparison` | Project (multiple) | Taste similarity between two specific members |
+| `compare_projects` | Project (multiple) | High-level taste comparison between any two projects |
 
 ### List vs. detail pattern
 

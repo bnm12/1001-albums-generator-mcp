@@ -156,6 +156,22 @@ Restart Claude Desktop after any config change.
 | `get_group_latest_album` | Latest group album with all member votes attached                            |
 | `get_group_album_reviews`| All member reviews and ratings for a specific group album                   |
 
+### Analysis Tools
+
+| Tool | Description |
+|---|---|
+| `get_taste_profile` | Comprehensive taste profile: decade distribution, top genres/styles/artists, rating tendencies, community alignment |
+| `get_rating_outliers` | Albums where the user diverges most from community consensus, in either direction |
+| `get_album_context` | Rich contextual data: artist arc, musical connections, community divergence, listening journey |
+
+### Group Analysis Tools
+
+| Tool | Description |
+|---|---|
+| `get_group_album_insights` | Most divisive and most consensus albums across a group, ranked by rating variance |
+| `get_group_member_comparison` | Side-by-side taste comparison between two members: similarity score, shared albums, rating divergence |
+| `compare_projects` | High-level comparison of two projects: genre affinity, decade preferences, overlap, rating tendencies |
+
 ### Community Tools
 
 | Tool                              | Description                                               |
