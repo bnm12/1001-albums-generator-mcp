@@ -174,6 +174,47 @@ The server is deployed at `https://1001-albums-mcp.bnm12.dk` and runs behind a r
 - Trusting headers — forwarded IP or protocol headers (e.g. `X-Forwarded-For`) come from the proxy, not the client directly.
 - Avoid hardcoding `localhost` or any specific port in application logic; always use environment variables.
 
+## Testing
+
+Tests are written with [Vitest](https://vitest.dev) and co-located with source files.
+
+### Running tests
+
+```bash
+npm test              # Run all unit and integration tests once
+npm run test:watch    # Watch mode
+npm run test:coverage # Run with coverage report (output: coverage/)
+```
+
+### Test layers
+
+| Layer | File pattern | What it tests | Runs in CI |
+|---|---|---|---|
+| Unit | `src/**/*.test.ts` | Pure logic: helpers, DTOs | Yes |
+| Integration | `src/**/*.test.ts` | Every tool via real MCP protocol + mocked client | Yes |
+| Smoke | `src/**/*.smoke.test.ts` | Live API connectivity | No — opt-in |
+
+To run smoke tests: `TEST_LIVE_API=true npx vitest run --include="src/**/*.smoke.test.ts"`
+
+### Test infrastructure (`src/test/`)
+
+| File | Purpose |
+|---|---|
+| `fixtures.ts` | Factory functions for all API types (`makeAlbum`, `makeProjectInfo`, etc.) |
+| `mock-client.ts` | `makeMockClient()` — returns a `vi.fn()`-stubbed `AlbumsGeneratorClient` |
+| `create-test-client.ts` | `createTestClient(mockClient)` — wires `McpServer` + `Client` via `InMemoryTransport` |
+| `assertions.ts` | `assertToolSuccess`, `assertToolError` — parse MCP tool responses cleanly |
+
+### When adding new tools
+
+Add a corresponding `describe` block in the relevant `src/tools/*.test.ts` file. Cover:
+- Happy path: correct return shape and field values
+- Empty/missing required parameters: verify error response (not a thrown exception)
+- Edge cases specific to the tool's logic
+
+Follow the `beforeEach` / `afterEach` pattern from existing tests to ensure transport
+cleanup between tests.
+
 ## Development
 
 - Run `npm run build` to compile the TypeScript code.
