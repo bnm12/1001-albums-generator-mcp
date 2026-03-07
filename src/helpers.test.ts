@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateProjectStats,
+  computeCompatibilityMatrix,
   computePairSimilarity,
   computeRatingTendencies,
   frequencyMap,
@@ -11,7 +12,7 @@ import {
   requireParam,
   topN,
 } from "./helpers.js";
-import { makeHistoryEntry } from "./test/fixtures.js";
+import { makeAlbum, makeHistoryEntry } from "./test/fixtures.js";
 
 describe("helpers", () => {
   it("calculateProjectStats counts only numeric ratings > 0", () => {
@@ -109,6 +110,181 @@ describe("helpers", () => {
     );
     expect(partial.sharedAlbumsCount).toBe(1);
     expect(partial.meanAbsoluteDivergence).toBe(2);
+  });
+
+
+  describe("computeCompatibilityMatrix", () => {
+    it("returns empty structure for empty member list", () => {
+      const matrix = computeCompatibilityMatrix([], new Map());
+      expect(matrix).toEqual({
+        pairs: [],
+        mostCompatible: null,
+        leastCompatible: null,
+        memberAverages: [],
+      });
+    });
+
+    it("handles two members with no shared albums", () => {
+      const members = ["a", "b"];
+      const histories = new Map([
+        [
+          "a",
+          [
+            makeHistoryEntry({ album: makeAlbum({ uuid: "uuid-1" }), rating: 4 }),
+            makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "uuid-2" }), rating: 3 }),
+          ],
+        ],
+        [
+          "b",
+          [
+            makeHistoryEntry({ album: makeAlbum({ uuid: "uuid-3" }), rating: 2 }),
+            makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "uuid-4" }), rating: 5 }),
+          ],
+        ],
+      ]);
+
+      const matrix = computeCompatibilityMatrix(members, histories);
+      expect(matrix.pairs).toHaveLength(1);
+      expect(matrix.pairs[0]).toMatchObject({ sharedAlbumsCount: 0, similarityScore: null });
+      expect(matrix.mostCompatible).toBeNull();
+      expect(matrix.leastCompatible).toBeNull();
+    });
+
+    it("handles two members with identical ratings on shared albums", () => {
+      const shared = ["uuid-1", "uuid-2", "uuid-3"];
+      const historyA = shared.map((uuid, i) =>
+        makeHistoryEntry({ generatedAlbumId: `${i + 1}`, album: makeAlbum({ uuid }), rating: 4 }),
+      );
+      const historyB = shared.map((uuid, i) =>
+        makeHistoryEntry({ generatedAlbumId: `${i + 1}`, album: makeAlbum({ uuid }), rating: 4 }),
+      );
+
+      const matrix = computeCompatibilityMatrix(
+        ["a", "b"],
+        new Map([
+          ["a", historyA],
+          ["b", historyB],
+        ]),
+      );
+
+      expect(matrix.pairs[0]).toMatchObject({ similarityScore: 100, meanAbsoluteDivergence: 0 });
+      expect(matrix.mostCompatible).toEqual(matrix.pairs[0]);
+      expect(matrix.leastCompatible).toEqual(matrix.pairs[0]);
+      expect(matrix.memberAverages).toEqual([
+        { member: "a", averageSimilarity: 100 },
+        { member: "b", averageSimilarity: 100 },
+      ]);
+    });
+
+    it("handles maximum divergence", () => {
+      const shared = ["uuid-1", "uuid-2", "uuid-3"];
+      const historyA = shared.map((uuid, i) =>
+        makeHistoryEntry({ generatedAlbumId: `${i + 1}`, album: makeAlbum({ uuid }), rating: 1 }),
+      );
+      const historyB = shared.map((uuid, i) =>
+        makeHistoryEntry({ generatedAlbumId: `${i + 1}`, album: makeAlbum({ uuid }), rating: 5 }),
+      );
+
+      const matrix = computeCompatibilityMatrix(
+        ["a", "b"],
+        new Map([
+          ["a", historyA],
+          ["b", historyB],
+        ]),
+      );
+
+      expect(matrix.pairs[0]).toMatchObject({ meanAbsoluteDivergence: 4, similarityScore: 0 });
+    });
+
+    it("computes compatibility ordering for three members", () => {
+      const alice = [
+        makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 5 }),
+        makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "u2" }), rating: 5 }),
+        makeHistoryEntry({ generatedAlbumId: "3", album: makeAlbum({ uuid: "u3" }), rating: 5 }),
+        makeHistoryEntry({ generatedAlbumId: "4", album: makeAlbum({ uuid: "u4" }), rating: 5 }),
+      ];
+      const bob = [
+        makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 5 }),
+        makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "u2" }), rating: 4 }),
+        makeHistoryEntry({ generatedAlbumId: "3", album: makeAlbum({ uuid: "u3" }), rating: 4 }),
+        makeHistoryEntry({ generatedAlbumId: "4", album: makeAlbum({ uuid: "u4" }), rating: 3 }),
+      ];
+      const carol = [
+        makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 1 }),
+        makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "u2" }), rating: 1 }),
+        makeHistoryEntry({ generatedAlbumId: "3", album: makeAlbum({ uuid: "u3" }), rating: 4 }),
+        makeHistoryEntry({ generatedAlbumId: "4", album: makeAlbum({ uuid: "u4" }), rating: 3 }),
+      ];
+
+      const matrix = computeCompatibilityMatrix(
+        ["alice", "bob", "carol"],
+        new Map([
+          ["alice", alice],
+          ["bob", bob],
+          ["carol", carol],
+        ]),
+      );
+
+      expect(matrix.pairs).toHaveLength(3);
+      expect([matrix.mostCompatible?.memberA, matrix.mostCompatible?.memberB]).toEqual(["alice", "bob"]);
+      expect([matrix.leastCompatible?.memberA, matrix.leastCompatible?.memberB]).toEqual(["alice", "carol"]);
+      expect(matrix.memberAverages[0].member).toBe("bob");
+      expect(matrix.memberAverages[2].member).toBe("carol");
+    });
+
+    it("sorts member averages descending with nulls last", () => {
+      const matrix = computeCompatibilityMatrix(
+        ["alice", "bob", "carol"],
+        new Map([
+          ["alice", [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })]],
+          ["bob", [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 5 })]],
+          ["carol", [makeHistoryEntry({ album: makeAlbum({ uuid: "u2" }), rating: 3 })]],
+        ]),
+      );
+
+      expect(matrix.memberAverages[0]).toEqual({ member: "alice", averageSimilarity: 75 });
+      expect(matrix.memberAverages[1]).toEqual({ member: "bob", averageSimilarity: 75 });
+      expect(matrix.memberAverages[2]).toEqual({ member: "carol", averageSimilarity: null });
+    });
+
+    it("rounds member average similarity to 2 decimals", () => {
+      const matrix = computeCompatibilityMatrix(
+        ["alice", "bob", "carol", "dave"],
+        new Map([
+          ["alice", [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })]],
+          ["bob", [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })]],
+          ["carol", [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 2 })]],
+          ["dave", [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 2 })]],
+        ]),
+      );
+
+      const aliceAverage = matrix.memberAverages.find((m) => m.member === "alice");
+      expect(aliceAverage?.averageSimilarity).toBe(66.67);
+
+      const abPair = computePairSimilarity(
+        "alice",
+        [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })],
+        "bob",
+        [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })],
+      );
+      const acPair = computePairSimilarity(
+        "alice",
+        [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })],
+        "carol",
+        [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 2 })],
+      );
+      const adPair = computePairSimilarity(
+        "alice",
+        [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })],
+        "dave",
+        [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 2 })],
+      );
+      expect(
+        Math.round(
+          (((abPair.similarityScore ?? 0) + (acPair.similarityScore ?? 0) + (adPair.similarityScore ?? 0)) / 3) * 100,
+        ) / 100,
+      ).toBe(66.67);
+    });
   });
 
   it("requireParam behavior", () => {

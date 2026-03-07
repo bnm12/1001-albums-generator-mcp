@@ -8,6 +8,13 @@ export interface PairSimilarity {
   similarityScore: number | null;
 }
 
+export interface CompatibilityMatrix {
+  pairs: PairSimilarity[];
+  mostCompatible: PairSimilarity | null;
+  leastCompatible: PairSimilarity | null;
+  memberAverages: { member: string; averageSimilarity: number | null }[];
+}
+
 export function calculateProjectStats(history: UserAlbumHistoryEntry[]) {
   const albumsGenerated = history.length;
   const albumsRated = history.filter(
@@ -150,6 +157,64 @@ export function computePairSimilarity(
     meanAbsoluteDivergence: Math.round(meanAbsoluteDivergence * 100) / 100,
     similarityScore,
   };
+}
+
+export function computeCompatibilityMatrix(
+  members: string[],
+  histories: Map<string, UserAlbumHistoryEntry[]>,
+): CompatibilityMatrix {
+  const pairs: PairSimilarity[] = [];
+
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const memberA = members[i];
+      const memberB = members[j];
+      const historyA = histories.get(memberA) ?? [];
+      const historyB = histories.get(memberB) ?? [];
+      pairs.push(computePairSimilarity(memberA, historyA, memberB, historyB));
+    }
+  }
+
+  const scoredPairs = pairs.filter((p) => p.similarityScore !== null);
+
+  const mostCompatible =
+    scoredPairs.length > 0
+      ? scoredPairs.reduce((best, p) =>
+          (p.similarityScore ?? 0) > (best.similarityScore ?? 0) ? p : best,
+        )
+      : null;
+
+  const leastCompatible =
+    scoredPairs.length > 0
+      ? scoredPairs.reduce((worst, p) =>
+          (p.similarityScore ?? Infinity) < (worst.similarityScore ?? Infinity)
+            ? p
+            : worst,
+        )
+      : null;
+
+  const memberAverages = members.map((member) => {
+    const relevantPairs = scoredPairs.filter(
+      (p) => p.memberA === member || p.memberB === member,
+    );
+    const averageSimilarity =
+      relevantPairs.length > 0
+        ? Math.round(
+            (relevantPairs.reduce((sum, p) => sum + (p.similarityScore ?? 0), 0) /
+              relevantPairs.length) *
+              100,
+          ) / 100
+        : null;
+    return { member, averageSimilarity };
+  });
+
+  memberAverages.sort((a, b) => {
+    if (a.averageSimilarity === null) return 1;
+    if (b.averageSimilarity === null) return -1;
+    return b.averageSimilarity - a.averageSimilarity;
+  });
+
+  return { pairs, mostCompatible, leastCompatible, memberAverages };
 }
 
 export function requireParam(

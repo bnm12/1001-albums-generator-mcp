@@ -75,7 +75,7 @@ The \`projectIdentifier\` values in \`group.members\` are the inputs for member-
 | Which albums divided the group most? | \`get_group_album_insights\` |
 | Which albums did the group all agree on? | \`get_group_album_insights\` (mostConsensus) |
 | What do all members think of a specific album? | \`get_group_album_reviews\` |
-| Who in the group agrees with me most? | \`get_group_compatibility_matrix\` |
+| Who in the group has most/least compatible taste overall? | \`get_group_compatibility_matrix\` |
 | Compare two specific members in detail | \`get_group_member_comparison\` |
 
 **Recommended group workflow for "who agrees with whom":**

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertToolError, assertToolSuccess } from "../test/assertions.js";
 import { createTestClient, type TestClient } from "../test/create-test-client.js";
-import { makeAlbum, makeGroupInfo, makeHistoryEntry, makeProjectInfo } from "../test/fixtures.js";
+import type { ProjectInfo } from "../api.js";
+import { makeAlbum, makeGroupInfo, makeGroupMember, makeHistoryEntry, makeProjectInfo } from "../test/fixtures.js";
 import { makeMockClient } from "../test/mock-client.js";
 
 describe("comparison tools", () => {
@@ -59,6 +60,154 @@ describe("comparison tools", () => {
 
     assertToolError(await testClient.client.callTool({ name: "get_group_member_comparison", arguments: { projectIdentifierA: "", projectIdentifierB: "b" } }), "projectIdentifierA");
     assertToolError(await testClient.client.callTool({ name: "get_group_member_comparison", arguments: { projectIdentifierA: "a", projectIdentifierB: "" } }), "projectIdentifierB");
+  });
+
+
+  describe("get_group_compatibility_matrix", () => {
+    it("returns correct number of pairs for group sizes", async () => {
+      const aliceHistory = [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 5 })];
+      const bobHistory = [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 4 })];
+      const carolHistory = [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 1 })];
+
+      mockClient.getProject.mockImplementation(async (id: string) => {
+        const projects: Record<string, ProjectInfo> = {
+          alice: makeProjectInfo({ name: "alice", history: aliceHistory }),
+          bob: makeProjectInfo({ name: "bob", history: bobHistory }),
+          carol: makeProjectInfo({ name: "carol", history: carolHistory }),
+        };
+        return projects[id] ?? makeProjectInfo({ name: id });
+      });
+
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({
+          members: [makeGroupMember("alice"), makeGroupMember("bob"), makeGroupMember("carol")],
+        }),
+      );
+
+      const three = assertToolSuccess(
+        await testClient.client.callTool({
+          name: "get_group_compatibility_matrix",
+          arguments: { groupSlug: "g1" },
+        }),
+      ) as { pairs: unknown[] };
+      expect(three.pairs.length).toBe((3 * (3 - 1)) / 2);
+
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({ members: [makeGroupMember("alice"), makeGroupMember("bob")] }),
+      );
+      const two = assertToolSuccess(
+        await testClient.client.callTool({
+          name: "get_group_compatibility_matrix",
+          arguments: { groupSlug: "g2" },
+        }),
+      ) as { pairs: unknown[] };
+      expect(two.pairs.length).toBe((2 * (2 - 1)) / 2);
+    });
+
+    it("returns mostCompatible/leastCompatible and sorted member averages", async () => {
+      const aliceHistory = [
+        makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 5 }),
+        makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "u2" }), rating: 4 }),
+      ];
+      const bobHistory = [
+        makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 5 }),
+        makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "u2" }), rating: 4 }),
+      ];
+      const carolHistory = [
+        makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 1 }),
+        makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ uuid: "u2" }), rating: 1 }),
+      ];
+
+      mockClient.getProject.mockImplementation(async (id: string) => {
+        const projects: Record<string, ProjectInfo> = {
+          alice: makeProjectInfo({ name: "alice", history: aliceHistory }),
+          bob: makeProjectInfo({ name: "bob", history: bobHistory }),
+          carol: makeProjectInfo({ name: "carol", history: carolHistory }),
+        };
+        return projects[id] ?? makeProjectInfo({ name: id });
+      });
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({
+          members: [makeGroupMember("alice"), makeGroupMember("bob"), makeGroupMember("carol")],
+        }),
+      );
+
+      const data = assertToolSuccess(
+        await testClient.client.callTool({
+          name: "get_group_compatibility_matrix",
+          arguments: { groupSlug: "g1" },
+        }),
+      ) as {
+        mostCompatible: { memberA: string; memberB: string } | null;
+        leastCompatible: { memberA: string; memberB: string } | null;
+        memberAverages: Array<{ averageSimilarity: number | null }>;
+      };
+
+      expect(data.mostCompatible).toMatchObject({ memberA: "alice", memberB: "bob" });
+      expect(data.leastCompatible).toMatchObject({ memberA: "alice", memberB: "carol" });
+      expect((data.memberAverages[0].averageSimilarity ?? -1) >= (data.memberAverages[1].averageSimilarity ?? -1)).toBe(true);
+    });
+
+    it("returns error for empty groupSlug", async () => {
+      const result = await testClient.client.callTool({
+        name: "get_group_compatibility_matrix",
+        arguments: { groupSlug: "" },
+      });
+      assertToolError(result, "groupSlug");
+    });
+
+    it("handles group with no shared albums", async () => {
+      const aliceHistory = [makeHistoryEntry({ album: makeAlbum({ uuid: "u1" }), rating: 5 })];
+      const bobHistory = [makeHistoryEntry({ album: makeAlbum({ uuid: "u2" }), rating: 4 })];
+      const carolHistory = [makeHistoryEntry({ album: makeAlbum({ uuid: "u3" }), rating: 1 })];
+
+      mockClient.getProject.mockImplementation(async (id: string) => {
+        const projects: Record<string, ProjectInfo> = {
+          alice: makeProjectInfo({ name: "alice", history: aliceHistory }),
+          bob: makeProjectInfo({ name: "bob", history: bobHistory }),
+          carol: makeProjectInfo({ name: "carol", history: carolHistory }),
+        };
+        return projects[id] ?? makeProjectInfo({ name: id });
+      });
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({
+          members: [makeGroupMember("alice"), makeGroupMember("bob"), makeGroupMember("carol")],
+        }),
+      );
+
+      const data = assertToolSuccess(
+        await testClient.client.callTool({
+          name: "get_group_compatibility_matrix",
+          arguments: { groupSlug: "g1" },
+        }),
+      ) as {
+        pairs: Array<{ similarityScore: number | null }>;
+        mostCompatible: unknown;
+        leastCompatible: unknown;
+      };
+
+      expect(data.pairs.every((pair) => pair.similarityScore === null)).toBe(true);
+      expect(data.mostCompatible).toBeNull();
+      expect(data.leastCompatible).toBeNull();
+    });
+
+    it("returns a valid JSON response shape", async () => {
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history: [] }));
+      mockClient.getGroup.mockResolvedValue(
+        makeGroupInfo({ members: [makeGroupMember("alice"), makeGroupMember("bob")] }),
+      );
+
+      const result = await testClient.client.callTool({
+        name: "get_group_compatibility_matrix",
+        arguments: { groupSlug: "g1" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect(data).toHaveProperty("pairs");
+      expect(data).toHaveProperty("mostCompatible");
+      expect(data).toHaveProperty("leastCompatible");
+      expect(data).toHaveProperty("memberAverages");
+    });
   });
 
   it("compare_projects computes overlap/highlights and validates params", async () => {
