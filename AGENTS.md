@@ -26,6 +26,26 @@ The following files must not be modified unless the task explicitly requires it:
 - `tsconfig.json`
 - `package.json`
 
+## Write Endpoints
+
+The 1001 Albums Generator API does not expose publicly documented write endpoints for
+submitting ratings, writing reviews, or advancing the album queue. This has been
+confirmed by reviewing:
+
+- The official community API documentation (linked in Documentation Links below)
+- All known open-source third-party clients (including `michaelherger/1001Albums`,
+  `francisconroy/1001_albums_push`, and `bnm12/1001-albums-js-api`)
+- The upstream API behaviour of this MCP server over its development history
+
+One undocumented endpoint exists in the wild —
+`POST /api/project/{username}/paused` — which can unpause a project. It is not
+implemented here because it requires authentication credentials this server does not
+hold, and its usefulness as an MCP tool is minimal.
+
+**Do not spend time investigating write endpoints.** If the upstream API adds
+authenticated write support in future, it will appear in the official documentation.
+Until then, this server is intentionally read-only with respect to user data.
+
 ## Code Structure
 
 - `src/api.ts`: Contains the `AlbumsGeneratorClient` with throttling, caching, and data types.
