@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { AlbumsGeneratorClient } from "../api.js";
+import { slimGroupInfo } from "../dto.js";
 import { requireParam } from "../helpers.js";
 import { makeRegisterTool } from "./register-tool.js";
 
@@ -16,7 +17,8 @@ export function registerGroupTools(
 
 The member list is particularly important: the projectIdentifier for each member is what you pass to get_project_stats, list_project_history, get_taste_profile, get_rating_outliers, and get_group_member_comparison to analyse individual members.
 
-The allTimeHighscore and allTimeLowscore include the album and all member votes — use these to open discussions like "your group's most beloved album of all time is..." or "this is the one album everyone agreed was bad".
+Album fields (currentAlbum, allTimeHighscore, allTimeLowscore) are returned in slim format. allTimeHighscore and allTimeLowscore include a computed averageRating but not individual member votes — use get_group_album_reviews for per-member vote detail.
+Use get_album_of_the_day or get_group_latest_album for full album detail.
 
 Does not include the latest album with votes — use get_group_latest_album for that. The groupSlug is the group name in lowercase with hyphens instead of spaces (find it in the group page URL). Data is cached for 4 hours.`,
     {
@@ -26,8 +28,8 @@ Does not include the latest album with votes — use get_group_latest_album for 
       const gs = requireParam(groupSlug, "groupSlug");
       if (typeof gs === "object" && "error" in gs) return gs.response;
       const group = await client.getGroup(gs);
-      const { latestAlbumWithVotes, ...summary } = group;
-      return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+      const slim = slimGroupInfo(group);
+      return { content: [{ type: "text", text: JSON.stringify(slim, null, 2) }] };
     },
     true,
   );

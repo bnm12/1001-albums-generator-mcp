@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { AlbumsGeneratorClient } from "../api.js";
+import { slimAlbumStat } from "../dto.js";
 import { requireParam } from "../helpers.js";
 import { makeRegisterTool } from "./register-tool.js";
 
@@ -16,16 +17,7 @@ export function registerCommunityTools(
     {},
     async () => {
       const stats = await client.getGlobalStats();
-      const slim = stats.albums.map((s) => ({
-        name: s.name,
-        artist: s.artist,
-        releaseDate: s.releaseDate,
-        genres: s.genres,
-        votes: s.votes,
-        averageRating: s.averageRating,
-        controversialScore: s.controversialScore,
-        votesByGrade: s.votesByGrade,
-      }));
+      const slim = stats.albums.map(slimAlbumStat);
       return {
         content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };
@@ -49,16 +41,7 @@ export function registerCommunityTools(
           s.name.toLowerCase().includes(lowerQuery) ||
           s.artist.toLowerCase().includes(lowerQuery),
       );
-      const slim = filtered.map((s) => ({
-        name: s.name,
-        artist: s.artist,
-        releaseDate: s.releaseDate,
-        genres: s.genres,
-        votes: s.votes,
-        averageRating: s.averageRating,
-        controversialScore: s.controversialScore,
-        votesByGrade: s.votesByGrade,
-      }));
+      const slim = filtered.map(slimAlbumStat);
       return {
         content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };
@@ -72,16 +55,7 @@ export function registerCommunityTools(
     {},
     async () => {
       const stats = await client.getUserAlbumStats();
-      const slim = stats.albums.map((a) => ({
-        name: a.name,
-        artist: a.artist,
-        releaseDate: a.releaseDate,
-        genres: a.genres,
-        votes: a.votes,
-        averageRating: a.averageRating,
-        controversialScore: a.controversialScore,
-        votesByGrade: a.votesByGrade,
-      }));
+      const slim = stats.albums.map(slimAlbumStat);
       return {
         content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
       };

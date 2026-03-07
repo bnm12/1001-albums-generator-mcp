@@ -33,6 +33,7 @@ The following files must not be modified unless the task explicitly requires it:
   - `createMcpServer()` — factory function that creates a new `McpServer` instance and registers all tools, prompts, and resources on it. Must be called once per session in HTTP mode, and once in stdio mode.
   - `main()` — starts the server in either `stdio` or `sse` (Streamable HTTP) mode based on the `MCP_MODE` environment variable.
 - `src/test-api.ts` & `src/test-cache.ts`: Utility scripts for verifying API connectivity and caching logic.
+- `src/dto.ts`: Defines slim interfaces and transform functions for all API types. Any tool that returns a list or aggregate must use these functions. Summary/orientation tools (`get_project_stats`, `get_group`) slim their nested album fields but otherwise return full responses. Full-response detail tools return raw API types directly. Always include IDs (`uuid`, `slug`, `generatedAlbumId`) on slim objects to enable downstream tool lookups.
 
 ## When Adding New Tools
 
@@ -77,7 +78,7 @@ ratings, no reviews, no history. They are community-wide aggregates only.
 | `list_book_album_stats`           | Book list           | Browsing/ranking the canonical 1001 albums                                     |
 | `get_book_album_stat`             | Book list           | Looking up a specific book album's community stats                             |
 | `list_user_submitted_album_stats` | User-submitted      | Browsing albums added by the community outside the book                        |
-| `get_project_stats`               | Project             | A user's progress: how many rated, current album, group info                   |
+| `get_project_stats`               | Project             | A user's progress: how many rated, current album (slim), group info. Use `get_album_of_the_day` for full current album detail. |
 | `list_project_history`            | Project             | Browsing a user's full listening history with their ratings                    |
 | `search_project_history`          | Project             | Searching a user's history by name, artist, year, or genre                     |
 | `get_album_detail`                | Project             | Full detail for one album: review, streaming links, metadata                   |
@@ -85,7 +86,7 @@ ratings, no reviews, no history. They are community-wide aggregates only.
 | `get_album_context`               | Project             | Artist arc, musical connections, community divergence, listening journey       |
 | `get_taste_profile`               | Project             | Overall taste summary: genres, decades, rating tendencies, community alignment |
 | `get_rating_outliers`             | Project             | Albums where the user most diverges from community consensus                   |
-| `get_group`                       | Group               | Group summary: members, current album, all-time high/low scoring albums        |
+| `get_group`                       | Group               | Group summary: members, slim current album, all-time high/low with computed averageRating. Use `get_group_latest_album` for full latest album with votes. |
 | `get_group_latest_album`          | Group               | Latest group album with all member votes attached                              |
 | `get_group_album_reviews`         | Group album reviews | All member reviews and ratings for a specific group album                      |
 | `get_group_album_insights`        | Project (multiple)  | Most divisive and consensus albums across a group, ranked by rating variance   |
@@ -180,6 +181,7 @@ The server is deployed at `https://1001-albums-mcp.bnm12.dk` and runs behind a r
 - Run `MCP_MODE=sse PORT=3000 node dist/index.js` to start on HTTP at `http://localhost:3000/mcp`.
 - When adding new tools, add them inside `createMcpServer()` and ensure they benefit from the caching layer in `api.ts`.
 - When adding new tools, you **must** update `README.md`, `AGENTS.md`, and the `info://1001-albums/tool-guide` resource in `src/index.ts`.
+- When adding new tools, always use slim functions from `src/dto.ts` for list and aggregate responses. Never inline object slimming in tool handlers. If a new raw type needs slimming, add its interface and function to `src/dto.ts` first.
 - The `get_album_context` tool implements logical limits (e.g., 20 items per category) on historical data to handle project histories of up to 2000 items while staying within LLM context limits. Apply the same philosophy to all new tools — return slim, ranked, and capped results rather than raw data dumps.
 - Genre and decade affinity is always computed from **average ratings**, not listen counts. Albums are assigned randomly, so listen count carries no preference signal.
 - All member project fetches in group tools must use `Promise.all()` for parallel execution — never fetch member projects sequentially.

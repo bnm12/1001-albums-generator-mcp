@@ -10,6 +10,7 @@ import {
   ratingAffinityMap,
   requireParam,
 } from "../helpers.js";
+import { slimAlbum } from "../dto.js";
 import { makeRegisterTool } from "./register-tool.js";
 
 export function registerComparisonTools(
@@ -45,13 +46,13 @@ Use alongside get_group_member_comparison to understand not just which albums di
       const group = await client.getGroup(gs);
       const memberProjects = await Promise.all(group.members.map((m) => client.getProject(m.projectIdentifier)));
 
-      const albumRatingsMap = new Map<string, { name: string; artist: string; releaseDate: string; ratings: { member: string; rating: number }[] }>();
+      const albumRatingsMap = new Map<string, { uuid: string; name: string; artist: string; releaseDate: string; ratings: { member: string; rating: number }[] }>();
       memberProjects.forEach((project, i) => {
         const memberName = group.members[i].projectIdentifier;
         getRatedEntries(project.history).forEach((h) => {
           const uuid = h.album.uuid;
           if (!albumRatingsMap.has(uuid)) {
-            albumRatingsMap.set(uuid, { name: h.album.name, artist: h.album.artist, releaseDate: h.album.releaseDate, ratings: [] });
+            albumRatingsMap.set(uuid, { uuid, name: h.album.name, artist: h.album.artist, releaseDate: h.album.releaseDate, ratings: [] });
           }
           albumRatingsMap.get(uuid)?.ratings.push({ member: memberName, rating: h.rating });
         });
@@ -118,8 +119,12 @@ Use get_group_album_insights first to identify which albums divided the group mo
         if (!a || !b) {
           return null;
         }
-        const divergence = Math.round((a.rating - b.rating) * 100) / 100;
-        return { name: a.album.name, artist: a.album.artist, releaseDate: a.album.releaseDate, ratingA: a.rating, ratingB: b.rating, divergence };
+        return {
+          ...slimAlbum(a.album),
+          ratingA: a.rating,
+          ratingB: b.rating,
+          divergence: Math.round((a.rating - b.rating) * 100) / 100,
+        };
       }).filter((a): a is NonNullable<typeof a> => a !== null);
 
       sharedAlbums.sort((a, b) => Math.abs(b.divergence) - Math.abs(a.divergence));
@@ -210,7 +215,12 @@ Data is cached for 4 hours.`,
           const a = mapA.get(uuid);
           const b = mapB.get(uuid);
           if (!a || !b) return null;
-          return { name: a.album.name, artist: a.album.artist, globalRating: a.globalRating ?? null, ratingA: a.rating, ratingB: b.rating };
+          return {
+            ...slimAlbum(a.album),
+            globalRating: a.globalRating ?? null,
+            ratingA: a.rating,
+            ratingB: b.rating,
+          };
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
         .sort((a, b) => (b.globalRating ?? 0) - (a.globalRating ?? 0))
