@@ -293,6 +293,29 @@ Contributions welcome. Some ideas:
 - Deeper album analysis (mood inference, BPM/key data)
 - Visual listening stats
 
+### Quality requirements (lint + typecheck)
+
+Before opening a PR, run these checks locally:
+
+```bash
+# Required: strict TypeScript checks
+npx tsc --noEmit
+
+# Required: ESLint (uses the repo's eslint.config.js)
+npm install --no-save --no-package-lock eslint @eslint/js typescript-eslint
+npx eslint .
+
+# Existing project checks
+npm run build
+npm test
+```
+
+Requirements:
+
+- Node.js 20+ (matches CI)
+- npm 10+
+- Internet access for one-off lint dependency install (`npm install --no-save ...`) unless already installed
+
 ```bash
 # Standard workflow
 git fork → branch → commit → pull request
