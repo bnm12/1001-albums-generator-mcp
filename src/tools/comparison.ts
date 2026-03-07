@@ -305,8 +305,12 @@ Data is cached for 4 hours.`,
           sharedAlbumsCount: sharedUuids.length,
           totalA: historyA.length,
           totalB: historyB.length,
-          overlapPercentageA: Math.round((sharedUuids.length / historyA.length) * 100),
-          overlapPercentageB: Math.round((sharedUuids.length / historyB.length) * 100),
+          overlapPercentageA: historyA.length > 0
+            ? Math.round((sharedUuids.length / historyA.length) * 100)
+            : 0,
+          overlapPercentageB: historyB.length > 0
+            ? Math.round((sharedUuids.length / historyB.length) * 100)
+            : 0,
         },
         ratingTendencies: {
           projectA: computeRatingTendencies(ratedA),

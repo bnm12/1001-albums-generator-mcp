@@ -59,6 +59,18 @@ describe("analysis tools", () => {
     const noGlobal = await testClient.client.callTool({ name: "get_taste_profile", arguments: { projectIdentifier: "p1" } });
     expect((assertToolSuccess(noGlobal) as { communityAlignment: { meanDivergence: number | null } }).communityAlignment.meanDivergence).toBeNull();
 
+    mockClient.getProject.mockResolvedValueOnce(makeProjectInfo({ history: [] }));
+    const emptyHistory = await testClient.client.callTool({
+      name: "get_taste_profile",
+      arguments: { projectIdentifier: "p1" },
+    });
+    const emptyData = assertToolSuccess(emptyHistory) as {
+      completionStats: { completionPercentage: number; albumsGenerated: number; albumsRated: number };
+    };
+    expect(emptyData.completionStats.albumsGenerated).toBe(0);
+    expect(emptyData.completionStats.albumsRated).toBe(0);
+    expect(emptyData.completionStats.completionPercentage).toBe(0);
+
     assertToolError(await testClient.client.callTool({ name: "get_taste_profile", arguments: { projectIdentifier: "" } }), "projectIdentifier");
   });
 
