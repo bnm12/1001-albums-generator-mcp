@@ -8,6 +8,8 @@
     "name": "bnm12"
   },
   "server": {
+    "type": "node",
+    "entry_point": "remote-shim/index.js",
     "mcp_config": {
       "command": "npx",
       "args": [
