@@ -53,9 +53,15 @@ Requires a projectIdentifier. For deeper analysis of a specific album, use get_a
       const topArtists = ratingAffinityMap(rated.map((h) => ({ genres: [h.album.artist], rating: h.rating })), (e) => e.genres).filter((a) => a.albumCount > 1).slice(0, 10);
 
       const tendencies = computeRatingTendencies(rated);
-      const ratedWithGlobal = rated.filter((h) => typeof h.globalRating === "number");
-      const meanDivergence = ratedWithGlobal.length > 0 ? Math.round((ratedWithGlobal.reduce((s, h) => s + (h.rating - (h.globalRating as number)), 0) / ratedWithGlobal.length) * 100) / 100 : null;
-      const meanAbsoluteDivergence = ratedWithGlobal.length > 0 ? Math.round((ratedWithGlobal.reduce((s, h) => s + Math.abs(h.rating - (h.globalRating as number)), 0) / ratedWithGlobal.length) * 100) / 100 : null;
+      const ratedWithGlobal = rated.filter(
+        (h): h is typeof h & { globalRating: number } => typeof h.globalRating === "number",
+      );
+      const meanDivergence = ratedWithGlobal.length > 0
+        ? Math.round((ratedWithGlobal.reduce((s, h) => s + (h.rating - h.globalRating), 0) / ratedWithGlobal.length) * 100) / 100
+        : null;
+      const meanAbsoluteDivergence = ratedWithGlobal.length > 0
+        ? Math.round((ratedWithGlobal.reduce((s, h) => s + Math.abs(h.rating - h.globalRating), 0) / ratedWithGlobal.length) * 100) / 100
+        : null;
       const communityAlignmentLabel =
         meanAbsoluteDivergence === null
           ? null
@@ -68,8 +74,17 @@ Requires a projectIdentifier. For deeper analysis of a specific album, use get_a
       const albumsGenerated = history.length;
       const albumsRated = rated.length;
 
+      const completionPercentage = albumsGenerated > 0
+        ? Math.round((albumsRated / albumsGenerated) * 100)
+        : 0;
+
       const profile = {
-        completionStats: { albumsGenerated, albumsRated, albumsUnrated: albumsGenerated - albumsRated, completionPercentage: Math.round((albumsRated / albumsGenerated) * 100) },
+        completionStats: {
+          albumsGenerated,
+          albumsRated,
+          albumsUnrated: albumsGenerated - albumsRated,
+          completionPercentage,
+        },
         decadeDistribution,
         topGenres,
         topStyles,

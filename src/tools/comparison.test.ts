@@ -246,6 +246,20 @@ describe("comparison tools", () => {
     const noOverlap = assertToolSuccess(await testClient.client.callTool({ name: "compare_projects", arguments: { projectIdentifierA: "a", projectIdentifierB: "none" } })) as { overlapSummary: { sharedAlbumsCount: number } };
     expect(noOverlap.overlapSummary.sharedAlbumsCount).toBe(0);
 
+    const emptyA = assertToolSuccess(await testClient.client.callTool({
+      name: "compare_projects",
+      arguments: { projectIdentifierA: "none", projectIdentifierB: "b" },
+    })) as { overlapSummary: { overlapPercentageA: number; overlapPercentageB: number } };
+    expect(emptyA.overlapSummary.overlapPercentageA).toBe(0);
+    expect(emptyA.overlapSummary.overlapPercentageB).toBe(0);
+
+    const emptyBoth = assertToolSuccess(await testClient.client.callTool({
+      name: "compare_projects",
+      arguments: { projectIdentifierA: "none", projectIdentifierB: "none" },
+    })) as { overlapSummary: { overlapPercentageA: number; overlapPercentageB: number } };
+    expect(emptyBoth.overlapSummary.overlapPercentageA).toBe(0);
+    expect(emptyBoth.overlapSummary.overlapPercentageB).toBe(0);
+
     assertToolError(await testClient.client.callTool({ name: "compare_projects", arguments: { projectIdentifierA: "", projectIdentifierB: "b" } }), "projectIdentifierA");
     assertToolError(await testClient.client.callTool({ name: "compare_projects", arguments: { projectIdentifierA: "a", projectIdentifierB: "" } }), "projectIdentifierB");
   });
