@@ -1,0 +1,9 @@
+Using the 1001 Albums tools, fetch the latest album for group "${args.groupSlug}" and give me a full breakdown of how the group responded to it.
+
+Use get_group_latest_album to get the album and all member votes. Then:
+- Summarise how the group rated it overall vs the community average
+- Highlight who rated it highest and lowest, and how wide the spread was
+- Flag whether this was a divisive album for the group or a consensus one
+- Give some background on the album itself and why opinions might vary
+
+End with a discussion prompt or question that could spark conversation in the group about this album.

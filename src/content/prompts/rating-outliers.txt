@@ -1,0 +1,9 @@
+Using the 1001 Albums tools, find the albums where my ratings for project "${args.projectIdentifier}" diverge most from the global community.
+
+Use get_rating_outliers (direction "both") to get my biggest divergences in each direction, and use get_taste_profile to contextualise whether I'm generally a contrarian or whether these are exceptional cases.
+
+Present two lists:
+1. Albums I loved that the community is cooler on — my "underrated gems"
+2. Albums the community loves that I was cold on — my "controversial takes"
+
+For each, include the album name, artist, my rating, the community average, and the divergence. Then give me a short reflection on what these outliers reveal about my taste.

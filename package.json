@@ -4,7 +4,7 @@
   "description": "A MCP server for interacting with 1001 albums generator",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/content dist/content",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts"
   },

@@ -1,0 +1,9 @@
+Using the 1001 Albums tools, give me a deep dive on "${args.albumName}" from my project "${args.projectIdentifier}".
+
+Use get_album_context to explore:
+- The artist arc: how does this album fit into everything else I've heard from this artist, and how did I rate their other work?
+- Musical connections: which other albums in my history are most closely related by genre and style?
+- My listening journey: what was I hearing just before and after this album, and does it represent a turning point or a continuation?
+- Community divergence: did I rate this in line with the community or did I diverge significantly — and is that typical of me?
+
+Also use get_album_detail to retrieve my written review if I left one. Synthesise everything into a narrative about what this album means in the context of my listening history.
