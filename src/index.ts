@@ -1683,6 +1683,282 @@ Format it as a series of bold headline stats followed by short punchy commentary
     }),
   );
 
+  // MCP Resources: static informational guides for agents
+  server.registerResource(
+    "1001-albums-about",
+    "info://1001-albums/about",
+    {
+      description:
+        "Background on the 1001 Albums You Must Hear Before You Die book and the 1001 Albums Generator web app — what they are, how they work, and key concepts needed to use this MCP server effectively.",
+      mimeType: "text/markdown",
+    },
+    async () => {
+      const text = `# 1001 Albums You Must Hear Before You Die — Concept Guide
+
+## The Book
+
+"1001 Albums You Must Hear Before You Die" is a reference book first published in 2003 and
+edited by Robert Dimery. It presents a curated list of approximately 1001 albums judged by
+a panel of music critics to be essential listening — not a popularity chart or a ranking,
+but a deliberately broad survey of recorded music history across genres, decades, and
+cultures.
+
+The list spans from the 1950s to the present day and covers rock, jazz, pop, classical,
+electronic, hip-hop, world music, and more. It is periodically revised: newer editions add
+recent releases and occasionally remove older entries, so the list is not entirely fixed.
+When users or tools refer to "book albums" or "the canonical list", they mean the albums
+drawn from this book.
+
+The book's goal is breadth and cultural significance over personal taste. An album being on
+the list does not mean it is universally loved — it means it is considered important,
+influential, or representative of its era or genre. Users will frequently encounter albums
+they have never heard of, in genres they do not usually enjoy.
+
+## The 1001 Albums Generator
+
+1001 Albums Generator (https://1001albumsgenerator.com) is a web application built around
+the book's list. Its core mechanic is simple: it assigns users one album at a time, chosen
+randomly from the list, and asks them to listen to it and rate it.
+
+Key facts about how it works:
+
+- **Albums are assigned randomly.** Users do not choose what they listen to. Each day (or
+  week, depending on settings) the generator picks the next album. This is fundamental to
+  understanding the data: a user's listening history is not a reflection of their taste
+  preferences — it is a random walk through music history. Listen count alone tells you
+  nothing about what a user likes.
+
+- **Ratings are 1–5.** After listening, users rate the album from 1 (lowest) to 5
+  (highest). Ratings are the primary signal of preference. An unrated album means the user
+  has not yet rated it — typically because it is the current album or they skipped rating.
+
+- **Reviews are optional.** Users can write a short text review alongside their rating.
+  Reviews are personal and qualitative — they are the richest source of insight into how a
+  user experienced an album.
+
+- **The current album is unrated.** The album assigned today has not yet been rated. It
+  appears as \`currentAlbum\` in the project data. Do not confuse it with historical rated
+  albums.
+
+- **User-submitted albums.** In addition to the ~1001 book albums, users can submit albums
+  that are not in the original book. These appear in a separate dataset. They are a niche
+  feature and most projects will be dominated by book albums.
+
+- **Update frequency varies.** Some users listen daily, others weekly. The \`generatedAt\`
+  field on each history entry records when that album was assigned, not when it was
+  listened to or rated.
+
+## Projects
+
+A "project" is an individual user's instance of the challenge. Each project has:
+- A name and an optional sharerId (an anonymised identifier for sharing without revealing
+  the project name)
+- A listening history: the ordered list of albums the generator has assigned, with ratings
+  and reviews
+- A current album: the album currently assigned, not yet rated
+- Optional group membership
+
+When calling tools, the \`projectIdentifier\` can be either the project name or the sharerId.
+If you have both, either works.
+
+## Groups
+
+A "group" is a collection of projects participating in the challenge together. Group members
+receive the same album assignments, allowing them to compare their reactions to the same
+music. Groups are identified by a \`groupSlug\` — the group name in lowercase with hyphens
+instead of spaces, visible in the group page URL.
+
+Groups enable social features: comparing ratings, finding the most divisive albums, and
+understanding taste compatibility across members.
+
+## The Community
+
+The global community rating for each album is the average rating across all 1001 Albums
+Generator users worldwide who have rated that album. This provides a baseline to compare
+any individual's or group's rating against. A high community rating means most users who
+heard this album liked it; a low one means most did not — though remember, all users are
+assigned albums randomly, so community ratings reflect reactions from a diverse and
+unself-selected audience.
+
+## What "affinity" means in this context
+
+Because albums are assigned randomly, genre and decade affinity must be inferred from
+ratings, not from listen counts. If a user has heard 10 jazz albums and rated them all
+highly, that signals genuine affinity for jazz. If they have heard 10 jazz albums and rated
+them all poorly, high listen count would be misleading — the correct signal is the average
+rating. All affinity computations in this server use average rating per genre/decade/artist,
+not raw listen counts.
+`;
+
+      return {
+        contents: [
+          {
+            uri: "info://1001-albums/about",
+            mimeType: "text/markdown",
+            text,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    "1001-albums-tool-guide",
+    "info://1001-albums/tool-guide",
+    {
+      description:
+        "A practical guide to the tools available in this MCP server — when to use each one, how they relate to each other, and recommended workflows for common questions.",
+      mimeType: "text/markdown",
+    },
+    async () => {
+      const text = `# 1001 Albums MCP — Tool Usage Guide
+
+## Orientation: start here
+
+Before answering any question about a user's listening history or taste, orient yourself
+with one of these two tools:
+
+- **\`get_project_stats\`** — quick summary of a project: how many albums generated, rated,
+  unrated, current album. Use when the question is about progress or status.
+- **\`get_taste_profile\`** — comprehensive taste analysis: top genres, decades, artists,
+  rating tendencies, community alignment. Use when the question is about taste, preference,
+  or identity as a listener.
+
+For group questions, start with:
+- **\`get_group\`** — group summary, member list, all-time high/low. Always call this first
+  for any group question — the member list it returns (with \`projectIdentifier\` for each
+  member) is needed as input for all other group and member-level tools.
+
+---
+
+## Finding and browsing albums
+
+| Question | Tool |
+|---|---|
+| What is today's album? | \`get_album_of_the_day\` |
+| Show me my full history | \`list_project_history\` |
+| Find albums by artist, genre, or year | \`search_project_history\` |
+| Get full detail, review, and streaming links for one album | \`get_album_detail\` |
+
+\`list_project_history\` and \`search_project_history\` return a slim format intentionally —
+no reviews, no streaming links, no images. Always call \`get_album_detail\` when you need
+a written review, a Spotify/Apple Music link, or full subgenre breakdown.
+
+---
+
+## Understanding an album in context
+
+Use **\`get_album_context\`** when the question is about a specific album's place in the
+user's history. It returns four dimensions:
+1. Artist arc — other albums by the same artist, with ratings
+2. Musical connections — related albums by genre/style overlap, scored by degree
+3. Community divergence — how the user's rating compares to the global average, with
+   a baseline of the user's typical divergence pattern
+4. Listening journey — the 3 albums before and after in chronological order
+
+Identify the album by name, UUID, or \`generatedAlbumId\` from \`list_project_history\`.
+
+---
+
+## Taste analysis
+
+| Question | Tool |
+|---|---|
+| What are my favourite genres/decades? | \`get_taste_profile\` |
+| Am I a harsh or generous rater? | \`get_taste_profile\` (ratingTendencies) |
+| Do I agree or disagree with the community? | \`get_taste_profile\` (communityAlignment) |
+| Which albums did I rate very differently from the community? | \`get_rating_outliers\` |
+| How has my genre exposure evolved over time? | \`list_project_history\` sorted by generatedAt, then analyse |
+
+\`get_rating_outliers\` takes a \`direction\` parameter: "\`underrated\`" (user rated lower than
+community), "\`overrated\`" (user rated higher), or "\`both\`". Use "\`both\`" for open-ended
+taste questions, and a specific direction when the user asks about hidden gems or
+controversial takes.
+
+---
+
+## Group analysis
+
+Always call \`get_group\` first to get the member list before calling any other group tool.
+The \`projectIdentifier\` values in \`group.members\` are the inputs for member-level tools.
+
+| Question | Tool |
+|---|---|
+| What is the group's current album and how did they rate it? | \`get_group_latest_album\` |
+| Which albums divided the group most? | \`get_group_album_insights\` |
+| Which albums did the group all agree on? | \`get_group_album_insights\` (mostConsensus) |
+| What do all members think of a specific album? | \`get_group_album_reviews\` |
+| Who in the group agrees with me most? | \`get_group_compatibility_matrix\` |
+| Compare two specific members in detail | \`get_group_member_comparison\` |
+
+**Recommended group workflow for "who agrees with whom":**
+1. \`get_group\` → get member list
+2. \`get_group_compatibility_matrix\` → get full pairwise scores and highlights
+3. \`get_group_member_comparison\` → drill into a specific pair for album-level detail
+
+**Recommended group workflow for "what divided us":**
+1. \`get_group\` → get member list
+2. \`get_group_album_insights\` → find most divisive albums
+3. \`get_group_album_reviews\` → get individual reviews for the most divisive album
+4. \`get_group_member_comparison\` → understand which members drove the division
+
+---
+
+## The book list and community data
+
+These tools query the global community dataset, not any individual project:
+
+| Question | Tool |
+|---|---|
+| What are the highest-rated book album globally? | \`list_book_album_stats\` |
+| How does the community rate a specific book album? | \`get_book_album_stat\` |
+| What user-submitted albums exist outside the book? | \`list_user_submitted_album_stats\` |
+
+These tools return community-wide data only — no individual ratings, no project history.
+
+---
+
+## Cache and data freshness
+
+All data is cached for 4 hours. If a user says their data seems stale or they have just
+rated an album and want to see updated results, use **\`refresh_data\`** with the appropriate
+type:
+- "\`project\`" + \`projectIdentifier\` — refresh one project
+- "\`group\`" + \`groupSlug\` — refresh one group
+- "\`global\`" — refresh the book album community stats
+- "\`user\`" — refresh the user-submitted album stats
+- "\`all\`" — clear everything
+
+---
+
+## Common mistakes to avoid
+
+- **Don't use listen count as a proxy for preference.** Albums are assigned randomly.
+  Always use ratings as the preference signal.
+- **Don't skip \`get_group\` before group tools.** The member \`projectIdentifier\` list it
+  returns is required input for nearly every other group tool.
+- **Don't call \`list_project_history\` when you need reviews or streaming links.** It
+  returns a slim format. Use \`get_album_detail\` for full information.
+- **Don't confuse the current album with history.** The \`currentAlbum\` is unrated and not
+  part of \`history\`. Use \`get_album_of_the_day\` to retrieve it.
+- **Treat similarity scores with low shared album counts cautiously.** A score based on
+  2–3 shared albums is not meaningful. Always report \`sharedAlbumsCount\` alongside any
+  similarity score.
+
+`;
+
+      return {
+        contents: [
+          {
+            uri: "info://1001-albums/tool-guide",
+            mimeType: "text/markdown",
+            text,
+          },
+        ],
+      };
+    },
+  );
+
   return server;
 }
 

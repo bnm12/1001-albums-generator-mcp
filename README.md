@@ -190,7 +190,17 @@ Restart Claude Desktop after any config change.
 
 ---
 
-## 💬 Prompt Templates
+## � MCP Resources
+
+This server publishes static resources that agents should read for orientation and tool usage guidance. They are registered inside `createMcpServer()` and available at the following URIs:
+
+| Resource URI | Purpose |
+|---|---|
+| `info://1001-albums/about` | Background and concept guide for the 1001 Albums book and Generator | 
+| `info://1001-albums/tool-guide` | Practical tool usage guide: which tool to use when and recommended workflows |
+
+
+## �💬 Prompt Templates
 
 Compatible clients (e.g. Claude Desktop) surface these as one-click conversation starters.
 
