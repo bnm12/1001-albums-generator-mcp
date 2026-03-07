@@ -177,6 +177,22 @@ return {
 throw new Error("projectIdentifier is required");
 ```
 
+### API errors
+
+Tool handlers must not let API errors (network failures, upstream 4xx/5xx responses)
+propagate as thrown exceptions. The `makeRegisterTool` wrapper in
+`src/tools/register-tool.ts` catches all thrown errors automatically and converts them
+to structured tool response text using `formatApiError` from `src/helpers.ts`.
+
+You do not need to add try/catch inside individual tool handlers for API call failures —
+the wrapper handles this. However, if a tool makes multiple API calls and needs to handle
+a partial failure differently (e.g. returning a degraded result rather than an error),
+you may add a local try/catch inside the handler for that specific call.
+
+`formatApiError(error, context)` is available for use in any code that catches errors
+outside of a tool handler. The `context` string should identify what was being fetched,
+e.g. `'Project "my-project"'`.
+
 ## Deployment
 
 The server is deployed at `https://1001-albums-mcp.bnm12.dk` and runs behind a reverse proxy. Keep this in mind when:
