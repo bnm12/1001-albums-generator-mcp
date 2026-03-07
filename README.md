@@ -170,6 +170,7 @@ Restart Claude Desktop after any config change.
 | ----------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `get_group_album_insights`    | Most divisive and most consensus albums across a group, ranked by rating variance                     |
 | `get_group_member_comparison` | Side-by-side taste comparison between two members: similarity score, shared albums, rating divergence |
+| `get_group_compatibility_matrix` | Group-wide pairwise taste compatibility — who agrees with whom, member averages, most and least compatible pairs |
 | `compare_projects`            | High-level comparison of two projects: genre affinity, decade preferences, overlap, rating tendencies |
 
 ### Community Tools

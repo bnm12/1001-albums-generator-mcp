@@ -1,7 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { UserAlbumHistoryEntry } from "../api.js";
 import { AlbumsGeneratorClient } from "../api.js";
 import {
+  computeCompatibilityMatrix,
   computeRatingTendencies,
   frequencyMap,
   getDecade,
@@ -162,6 +164,73 @@ Use get_group_album_insights first to identify which albums divided the group mo
       };
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+    true,
+  );
+
+
+
+  registerTool(
+    "get_group_compatibility_matrix",
+    `Returns a full pairwise taste compatibility matrix for every member pair in a group.
+Use this to answer questions like "who in the group agrees most?", "who are the outliers?",
+or "does this group have strong shared taste or is everyone very different?"
+
+The response includes:
+
+- PAIRS: Every unique member pair with their sharedAlbumsCount, meanAbsoluteDivergence,
+  and similarityScore (0–100, where 100 = perfect agreement). Pairs with no shared rated
+  albums have a null similarityScore.
+
+- MOST COMPATIBLE: The pair with the highest similarityScore — the two members who agree
+  most across their shared listening history.
+
+- LEAST COMPATIBLE: The pair with the lowest similarityScore — the two members who
+  diverge most.
+
+- MEMBER AVERAGES: Each member's average similarityScore across all their pairs, sorted
+  descending. The top member is the most agreeable (closest to the group consensus); the
+  bottom member is the outlier (most divergent from everyone else).
+
+⚠ PERFORMANCE WARNING: This tool fetches one project per group member from the API.
+Each fetch takes a minimum of 20 seconds due to upstream rate limiting, and fetches are
+serialised by the throttle queue even though they are fired in parallel. Execution time
+is at minimum (number of members × 20) seconds on a cold cache. For a 5-member group,
+expect at least 100 seconds. Cached data (within 4 hours) is served instantly with no
+wait. Always warn the user before calling this tool on a cold cache that it may take
+several minutes.
+
+Requires a groupSlug. Use get_group first to retrieve the member list if you do not
+already have it. For detailed album-level comparison between two specific members, use
+get_group_member_comparison instead. Data is cached for 4 hours per project.`,
+    {
+      groupSlug: z
+        .string()
+        .describe(
+          "The group slug (lowercase, hyphenated) from the group page URL",
+        ),
+    },
+    async ({ groupSlug }) => {
+      const gs = requireParam(groupSlug, "groupSlug");
+      if (typeof gs === "object" && "error" in gs) return gs.response;
+
+      const group = await client.getGroup(gs);
+      const members = group.members.map((m) => m.projectIdentifier);
+
+      // Fetch all member projects in parallel — the throttle queue in AlbumsGeneratorClient
+      // serialises the actual HTTP requests automatically.
+      const projects = await Promise.all(members.map((id) => client.getProject(id)));
+
+      const histories = new Map<string, UserAlbumHistoryEntry[]>();
+      members.forEach((id, i) => {
+        histories.set(id, projects[i].history);
+      });
+
+      const matrix = computeCompatibilityMatrix(members, histories);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(matrix, null, 2) }],
+      };
     },
     true,
   );

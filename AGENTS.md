@@ -43,6 +43,17 @@ When adding a new tool, you **must** also update all of the following:
 2. **`AGENTS.md`** — add the tool to the tool-to-dataset mapping table below.
 3. **`src/index.ts` resource `info://1001-albums/tool-guide`** — add the tool to the orientation table and, if relevant, to the recommended workflows section. This resource is the canonical guide AI agents use to decide which tool to reach for — keeping it current is as important as updating the README.
 
+4. **`src/tools/*.test.ts`** — add a `describe` block for the new tool in the relevant
+   test file. Every new tool must have at minimum:
+   - A happy-path test asserting the correct response shape
+   - A test for each required parameter being empty or missing, asserting an error
+     response (not a thrown exception)
+   - Any edge cases specific to the tool's logic (empty results, null fields, boundary
+     values)
+
+   Follow the `beforeEach` / `afterEach` pattern from existing tests. See the Testing
+   section for the full conventions.
+
 ## MCP Resources
 
 Two static resources are registered inside `createMcpServer()` in `src/index.ts`. They
