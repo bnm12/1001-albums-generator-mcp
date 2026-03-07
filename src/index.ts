@@ -1406,16 +1406,20 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
           role: "user",
           content: {
             type: "text",
-            text: `Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${args.projectIdentifier}" and explain your reasoning.
+            text: `First, read the resource at info://1001-albums/tool-guide to orient yourself on the correct
+  tool sequence for this kind of question, and info://1001-albums/about to understand how the
+  generator assigns albums and what ratings represent.
 
-To do this well, you should:
-1. Fetch today's album using get_album_of_the_day to know what it is
-2. Fetch my taste profile using get_taste_profile to understand my genre preferences, decade affinities, rating tendencies, and community alignment
-3. Search my history using search_project_history for albums in the same genre, style, or by the same artist to find relevant past ratings and reviews
-4. Use get_album_context to understand how this album fits musically into what I've already heard
-5. Use get_rating_outliers to understand whether I tend to agree or disagree with the community on albums like this
+  Using the 1001 Albums tools, I want you to predict how I will rate today's album for project "${args.projectIdentifier}" and explain your reasoning.
 
-Then give me a specific predicted rating (e.g. 3.5/5) with a confidence level and a detailed explanation of your reasoning — referencing my actual past ratings and reviews as evidence. Flag any uncertainties, e.g. if I have little history in this genre.`,
+  To do this well, you should:
+  1. Fetch today's album using get_album_of_the_day to know what it is
+  2. Fetch my taste profile using get_taste_profile to understand my genre preferences, decade affinities, rating tendencies, and community alignment
+  3. Search my history using search_project_history for albums in the same genre, style, or by the same artist to find relevant past ratings and reviews
+  4. Use get_album_context to understand how this album fits musically into what I've already heard
+  5. Use get_rating_outliers to understand whether I tend to agree or disagree with the community on albums like this
+
+  Then give me a specific predicted rating (e.g. 3.5/5) with a confidence level and a detailed explanation of your reasoning — referencing my actual past ratings and reviews as evidence. Flag any uncertainties, e.g. if I have little history in this genre.`,
           },
         },
       ],
@@ -1435,7 +1439,10 @@ Then give me a specific predicted rating (e.g. 3.5/5) with a confidence level an
           role: "user",
           content: {
             type: "text",
-            text: `Using the 1001 Albums tools, build a comprehensive profile of my music taste for project "${args.projectIdentifier}".
+            text: `First, read the resource at info://1001-albums/about to understand how the generator works
+and why ratings — not listen counts — are the correct signal for taste analysis.
+
+Using the 1001 Albums tools, build a comprehensive profile of my music taste for project "${args.projectIdentifier}".
 
 Use get_taste_profile as the foundation, then enrich it with get_rating_outliers to identify where I diverge most from the community. I want to understand:
 - What genres, decades, and styles dominate my history
@@ -1518,7 +1525,12 @@ For each, include the album name, artist, my rating, the community average, and 
           role: "user",
           content: {
             type: "text",
-            text: `Using the 1001 Albums tools, trace how my genre exposure has evolved over time for project "${args.projectIdentifier}".
+            text: `First, read the resource at info://1001-albums/about — particularly the section on random
+assignment. Keep in mind throughout that the user did not choose these albums; the genre
+distribution in their history reflects what the generator assigned, and only ratings reveal
+genuine preference.
+
+Using the 1001 Albums tools, trace how my genre exposure has evolved over time for project "${args.projectIdentifier}".
 
 Use list_project_history to get my full history in chronological order (sorted by generatedAt), then analyse how the genres shift across the timeline. I want to know:
 - Did I go through distinct phases or "eras" dominated by a particular genre?
@@ -1574,7 +1586,10 @@ End with a discussion prompt or question that could spark conversation in the gr
           role: "user",
           content: {
             type: "text",
-            text: `Using the 1001 Albums tools, analyse the taste compatibility across all members of group "${args.groupSlug}".
+            text: `First, read the resource at info://1001-albums/tool-guide — specifically the recommended
+group workflow for "who agrees with whom" — before calling any tools.
+
+Using the 1001 Albums tools, analyse the taste compatibility across all members of group "${args.groupSlug}".
 
 Use get_group_compatibility_matrix to get the full pairwise similarity scores, then give me:
 - The most compatible pair in the group and what their shared taste looks like
@@ -1603,7 +1618,11 @@ Make it conversational and fun — this should feel like a music compatibility r
           role: "user",
           content: {
             type: "text",
-            text: `Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${args.groupSlug}".
+            text: `First, read the resource at info://1001-albums/tool-guide — specifically the recommended
+group workflow for "what divided us" — and info://1001-albums/about for context on how
+group members share album assignments.
+
+Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${args.groupSlug}".
 
 Use get_group_album_insights to get the most divisive and most consensus albums. For the top divisive albums, use get_group_album_reviews to get the individual member reviews and ratings so you can show exactly who loved it and who didn't.
 
