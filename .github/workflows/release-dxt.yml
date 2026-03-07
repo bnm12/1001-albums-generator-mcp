@@ -42,11 +42,10 @@ jobs:
 
       - name: Pack Remote Extension
         run: |
-          mv manifest.json manifest-local-temp.json
-          mv manifest-remote.json manifest.json
-          dxt pack . 1001-albums-generator-mcp-remote.dxt
-          mv manifest.json manifest-remote.json
-          mv manifest-local-temp.json manifest.json
+          mkdir -p /tmp/remote-dxt/remote-shim
+          cp manifest-remote.json /tmp/remote-dxt/manifest.json
+          cp remote-shim/index.js /tmp/remote-dxt/remote-shim/index.js
+          dxt pack /tmp/remote-dxt 1001-albums-generator-mcp-remote.dxt
 
       - name: Create Prerelease
         uses: softprops/action-gh-release@v2
