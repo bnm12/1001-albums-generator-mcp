@@ -38,13 +38,18 @@ jobs:
           echo "name=v${PKG_VERSION} beta (${SHORT_SHA})" >> $GITHUB_OUTPUT
 
       - name: Pack Local Extension
-        run: dxt pack . 1001-albums-generator-mcp.dxt
+        run: |
+          cp manifest-local.json manifest.json
+          dxt pack . 1001-albums-generator-mcp-local.dxt
+          rm manifest.json
 
       - name: Pack Remote Extension
         run: |
           mkdir -p /tmp/remote-dxt/remote-shim
+          mkdir -p /tmp/remote-dxt/assets
           cp manifest-remote.json /tmp/remote-dxt/manifest.json
           cp remote-shim/index.js /tmp/remote-dxt/remote-shim/index.js
+          cp assets/logo.png /tmp/remote-dxt/assets/logo.png
           dxt pack /tmp/remote-dxt 1001-albums-generator-mcp-remote.dxt
 
       - name: Create Prerelease
@@ -53,7 +58,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
           files: |
-            1001-albums-generator-mcp.dxt
+            1001-albums-generator-mcp-local.dxt
             1001-albums-generator-mcp-remote.dxt
           draft: false
           prerelease: true

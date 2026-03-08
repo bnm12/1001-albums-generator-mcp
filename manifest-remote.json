@@ -4,6 +4,7 @@
   "display_name": "1001 Albums generator (Remote)",
   "version": "1.0.0",
   "description": "A MCP server for interacting with 1001 albums generator (Remote)",
+  "icon": "assets/logo.png",
   "author": {
     "name": "bnm12"
   },
