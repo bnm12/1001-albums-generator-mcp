@@ -15,6 +15,10 @@ async function main() {
     const port = process.env.PORT || 3000;
     const transports = new Map<string, StreamableHTTPServerTransport>();
 
+    app.get("/healthz", (_req, res) => {
+      res.status(200).json({ status: "ok" });
+    });
+
     app.all("/mcp", async (req, res, next) => {
       try {
         const sessionId = (req.query.sessionId || req.headers["mcp-session-id"] || req.headers["x-session-id"]) as string | undefined;
