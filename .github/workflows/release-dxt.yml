@@ -38,7 +38,10 @@ jobs:
           echo "name=v${PKG_VERSION} beta (${SHORT_SHA})" >> $GITHUB_OUTPUT
 
       - name: Pack Local Extension
-        run: dxt pack . 1001-albums-generator-mcp.dxt
+        run: |
+          cp manifest-local.json manifest.json
+          dxt pack . 1001-albums-generator-mcp-local.dxt
+          rm manifest.json
 
       - name: Pack Remote Extension
         run: |
@@ -53,7 +56,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
           files: |
-            1001-albums-generator-mcp.dxt
+            1001-albums-generator-mcp-local.dxt
             1001-albums-generator-mcp-remote.dxt
           draft: false
           prerelease: true

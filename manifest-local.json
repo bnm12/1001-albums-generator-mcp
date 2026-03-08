@@ -4,6 +4,7 @@
   "display_name": "1001 Albums generator",
   "version": "1.0.0",
   "description": "A MCP server for interacting with 1001 albums generator",
+  "icon": "assets/logo.png",
   "author": {
     "name": "bnm12"
   },

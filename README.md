@@ -71,7 +71,7 @@ No Node.js required for the remote version.
    | File           | What it does                                     |
    | -------------- | ------------------------------------------------ |
    | `*-remote.dxt` | Connects to the hosted server — zero local setup |
-   | `*.dxt`        | Runs the MCP server locally on your machine      |
+   | `*-local.dxt`  | Runs the MCP server locally on your machine      |
 
 2. Open **Claude Desktop → Settings → Extensions**
 3. Drag and drop the `.dxt` file into the window
