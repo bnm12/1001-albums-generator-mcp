@@ -185,7 +185,7 @@ Restart Claude Desktop after any config change.
 
 ² Identify albums by name, UUID, or `generatedAlbumId` (available from list/search results).
 
-³ `get_review_insights` uses **MCP Sampling** and requires the connected client to declare sampling capability. Claude Desktop supports this. Clients that don't receive a fallback with raw review text instead.
+³ `get_review_insights` attempts to use **MCP Sampling** to synthesise reviews. Most clients including Claude Desktop do not currently support sampling — the tool automatically falls back to returning the raw reviews with synthesis instructions for the agent to complete directly. Output quality is equivalent either way.
 
 ---
 
