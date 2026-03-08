@@ -139,14 +139,14 @@ Restart Claude Desktop after any config change.
 
 ### Project Tools
 
-| Tool                     | Description                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------- |
-| `get_album_of_the_day`   | Today's assigned album with full metadata and project notes                  |
-| `get_project_stats`      | Progress summary: albums generated, rated, unrated, current streak           |
+| Tool                     | Description                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_album_of_the_day`   | Today's assigned album with full metadata and project notes                                                                           |
+| `get_project_stats`      | Progress summary: albums generated, rated, unrated, current streak                                                                    |
 | `list_project_history`   | Full listening history with sort (recent/oldest/rated), pagination (limit/offset), and total count — use focused analysis tools first |
-| `search_project_history` | Search history by artist, album, year, or genre                              |
-| `get_album_detail`       | Complete detail for one album: review, streaming links, Wikipedia, subgenres |
-| `get_album_context`      | Relationships: same artist, same year, influences, styles, collaborators     |
+| `search_project_history` | Search history by artist, album, year, or genre                                                                                       |
+| `get_album_detail`       | Complete detail for one album: review, streaming links, Wikipedia, subgenres                                                          |
+| `get_album_context`      | Relationships: same artist, same year, influences, styles, collaborators                                                              |
 
 ### Group Tools
 
@@ -158,30 +158,30 @@ Restart Claude Desktop after any config change.
 
 ### Analysis Tools
 
-| Tool                  | Description                                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `get_taste_profile`   | Comprehensive taste profile: decade distribution, top genres/styles/artists, rating tendencies, community alignment |
-| `get_rating_outliers` | Albums where the user diverges most from community consensus, in either direction                                   |
-| `get_album_context`   | Rich contextual data: artist arc, musical connections, community divergence, listening journey                      |
-| `get_review_insights` | Synthesises qualitative insight from written reviews via MCP Sampling — album-anchored or open query |
-| `get_listening_arc`  | Structured listening journey analysis: arc segments, rating trends, community alignment drift, and milestones — designed for narrative generation |
+| Tool                  | Description                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_taste_profile`   | Comprehensive taste profile: decade distribution, top genres/styles/artists, rating tendencies, community alignment                               |
+| `get_rating_outliers` | Albums where the user diverges most from community consensus, in either direction                                                                 |
+| `get_album_context`   | Rich contextual data: artist arc, musical connections, community divergence, listening journey                                                    |
+| `get_review_insights` | Synthesises qualitative insight from written reviews via MCP Sampling — album-anchored or open query                                              |
+| `get_listening_arc`   | Structured listening journey analysis: arc segments, rating trends, community alignment drift, and milestones — designed for narrative generation |
 
 ### Group Analysis Tools
 
-| Tool                          | Description                                                                                           |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `get_group_album_insights`    | Most divisive and most consensus albums across a group, ranked by rating variance                     |
-| `get_group_member_comparison` | Side-by-side taste comparison between two members: similarity score, shared albums, rating divergence |
+| Tool                             | Description                                                                                                      |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `get_group_album_insights`       | Most divisive and most consensus albums across a group, ranked by rating variance                                |
+| `get_group_member_comparison`    | Side-by-side taste comparison between two members: similarity score, shared albums, rating divergence            |
 | `get_group_compatibility_matrix` | Group-wide pairwise taste compatibility — who agrees with whom, member averages, most and least compatible pairs |
-| `compare_projects`            | High-level comparison of two projects: genre affinity, decade preferences, overlap, rating tendencies |
+| `compare_projects`               | High-level comparison of two projects: genre affinity, decade preferences, overlap, rating tendencies            |
 
 ### Community Tools
 
-| Tool                              | Description                                               |
-| --------------------------------- | --------------------------------------------------------- |
+| Tool                              | Description                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------ |
 | `list_book_album_stats`           | Community ratings for all ~1001 canonical book albums with sort and pagination |
-| `get_book_album_stat`             | Search book albums by name, artist, genre, or year |
-| `list_user_submitted_album_stats` | Stats for user-submitted albums with sort and pagination |
+| `get_book_album_stat`             | Search book albums by name, artist, genre, or year                             |
+| `list_user_submitted_album_stats` | Stats for user-submitted albums with sort and pagination                       |
 
 ### Utility
 
@@ -210,20 +210,20 @@ This server publishes static resources that agents should read for orientation a
 
 Compatible clients (e.g. Claude Desktop) surface these as one-click conversation starters.
 
-| Prompt                  | Description                                                      |
-| ----------------------- | ---------------------------------------------------------------- |
-| `todays-album`          | Background and context on today's assigned album                 |
-| `predict-my-rating`     | Predict how you'll rate today's album based on your history      |
-| `taste-profile`         | Full analysis of your music taste and listener archetype         |
-| `album-deep-dive`       | Deep contextual analysis of a specific album in your history     |
-| `rating-outliers`       | Albums where your taste diverges most from the community         |
-| `genre-journey`         | How your genre exposure has evolved over time                    |
-| `group-latest-album`    | How your group rated their latest album                          |
-| `group-compatibility`   | Who in your group has the most similar and different taste       |
-| `group-divisive-albums` | Albums that divided your group most — and ones you all agreed on |
-| `compare-members`       | Detailed taste comparison between two group members              |
-| `listening-wrapped`     | Spotify Wrapped-style summary of your listening history          |
-| `personalized-pitch`   | Persuasive, taste-grounded pitch for a specific album (or today's album by default) |
+| Prompt                  | Description                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `todays-album`          | Background and context on today's assigned album                                    |
+| `predict-my-rating`     | Predict how you'll rate today's album based on your history                         |
+| `taste-profile`         | Full analysis of your music taste and listener archetype                            |
+| `album-deep-dive`       | Deep contextual analysis of a specific album in your history                        |
+| `rating-outliers`       | Albums where your taste diverges most from the community                            |
+| `genre-journey`         | How your genre exposure has evolved over time                                       |
+| `group-latest-album`    | How your group rated their latest album                                             |
+| `group-compatibility`   | Who in your group has the most similar and different taste                          |
+| `group-divisive-albums` | Albums that divided your group most — and ones you all agreed on                    |
+| `compare-members`       | Detailed taste comparison between two group members                                 |
+| `listening-wrapped`     | Spotify Wrapped-style summary of your listening history                             |
+| `personalized-pitch`    | Persuasive, taste-grounded pitch for a specific album (or today's album by default) |
 
 ## 💬 Example Prompts
 
@@ -304,8 +304,7 @@ Before opening a PR, run these checks locally:
 npx tsc --noEmit
 
 # Required: ESLint (uses the repo's eslint.config.js)
-npm install --no-save --no-package-lock eslint @eslint/js typescript-eslint
-npx eslint .
+npm run lint
 
 # Existing project checks
 npm run build

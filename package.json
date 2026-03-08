@@ -5,11 +5,12 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && cp -r src/content dist/content",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
   },
   "repository": {
     "type": "git",
@@ -31,11 +32,14 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.5",
     "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   }
 }
