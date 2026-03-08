@@ -358,7 +358,9 @@ Parameters:
 - limit: how many outliers to return per direction (default 10, max 25)
 - direction: "both" (default), "underrated" (user lower than community), or "overrated" (user higher than community)
 
-Combine with get_taste_profile to contextualise whether this user is generally contrarian (high mean absolute divergence) or whether these outliers are exceptional even for them. For a specific album's divergence in context, use get_album_context. Data is cached for 4 hours.`,
+Combine with get_taste_profile to contextualise whether this user is generally contrarian (high mean absolute divergence) or whether these outliers are exceptional even for them. For a specific album's divergence in context, use get_album_context. Data is cached for 4 hours.
+
+The "overrated by user" list (albums the user loves more than the community) reveals genuine enthusiasms — look for recurring stylistic patterns here as a predictor of future responses. The "underrated by user" list reveals consistent dislikes. Both lists are more reliable predictive signals than aggregate genre or decade averages, because they capture the specific qualities the user actually responds to rather than broad category membership.`,
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
       limit: z.number().int().min(1).max(25).default(10).describe("Number of outliers to return per direction (default 10)"),
@@ -548,12 +550,17 @@ by an algorithm, because LLMs are far better at extracting nuanced reasoning fro
 TWO CALL PATTERNS:
 
 1. ALBUM-ANCHORED — pass albumIdentifier (name, UUID, or generatedAlbumId):
-   Reviews are filtered to entries sharing genre, style, or artist with that album.
+   **For rating prediction tasks, always use \`albumIdentifier\`** — pass the album name or
+   UUID from \`get_album_of_the_day\`. This triggers automatic filtering to reviews of
+   albums with shared genres, styles, or artist, surfacing the most contextually relevant
+   entries.
    Best for: "How will this user respond to today's album?"
    Example: get_review_insights({ projectIdentifier: "x", albumIdentifier: "Kind of Blue" })
 
 2. OPEN QUERY — pass query (freetext string):
-   Reviews are filtered by matching artist name, album name, genre, or style.
+   The \`query\` parameter is for open-ended exploration (e.g. "jazz", "David Bowie") where
+   no specific album is the anchor. Using \`query\` for prediction tasks often returns zero
+   results if the genre terms don't match exactly.
    Best for: "What does this user think of David Bowie / jazz / experimental music?"
    Example: get_review_insights({ projectIdentifier: "x", query: "David Bowie" })
 

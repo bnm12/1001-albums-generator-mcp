@@ -160,7 +160,9 @@ and decide whether to fetch more.`,
 
   registerTool(
     "get_album_context",
-    `Identify the target album using its name, UUID, or generatedAlbumId. The tool searches in order: project history, today's current album, then the global book stats. This means it works for today's assigned album even before it has been rated — pass the album name or UUID from \`get_album_of_the_day\` directly. Artist arc and musical connections are always computed from history regardless of where the target album was found. Listening journey and community divergence are only available for albums in history.`,
+    `Identify the target album using its name, UUID, or generatedAlbumId. The tool searches in order: project history, today's current album, then the global book stats. This means it works for today's assigned album even before it has been rated — pass the album name or UUID from \`get_album_of_the_day\` directly. Artist arc and musical connections are always computed from history regardless of where the target album was found. Listening journey and community divergence are only available for albums in history.
+
+When closely connected albums are returned — particularly same artist, same style, or same year — consider calling \`get_album_detail\` on the most relevant ones to read the user's actual review. This is especially valuable when the connection shares a format (e.g. both live albums), era, or style with today's album, as the review may confirm or contradict assumptions about the user's preferences in that area.`,
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
       albumIdentifier: z.string().describe("The name, UUID, or generatedAlbumId of the album to contextualize"),
