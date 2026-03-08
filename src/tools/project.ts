@@ -150,10 +150,21 @@ and decide whether to fetch more.`,
         return (
           h.album.name.toLowerCase() === lowerId ||
           h.album.uuid === albumIdentifier ||
+          h.album.slug === albumIdentifier ||
           h.generatedAlbumId === albumIdentifier
         );
       });
-      return { content: [{ type: "text", text: JSON.stringify(result || null, null, 2) }] };
+      
+      if (!result) {
+        return {
+          content: [{
+            type: "text",
+            text: `Album "${albumIdentifier}" not found in project history. Try using the generatedAlbumId from list_project_history or search_project_history.`
+          }]
+        };
+      }
+      
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     },
     true,
   );
