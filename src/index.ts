@@ -56,7 +56,7 @@ async function main() {
             await transport.handleRequest(req, res);
           } else {
             console.error(`[HTTP] Session not found: ${sessionId}`);
-            res.status(400).send("Session not found");
+            res.status(404).send("Session not found");
           }
         } else {
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
