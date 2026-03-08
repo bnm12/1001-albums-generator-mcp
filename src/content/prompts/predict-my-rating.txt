@@ -13,8 +13,9 @@ First, read the resource at info://1001-albums/tool-guide to orient yourself on 
   2. **Establish taste character**: Call `get_rating_outliers` BEFORE forming any hypothesis. Read the "overrated by user" list carefully to identify the recurring stylistic patterns (energy, rawness, era, format) that reveal my genuine enthusiasms. This is your most reliable predictor.
   3. **Get qualitative evidence**: Use `get_review_insights` with `albumIdentifier` set to today's album name or UUID. Do NOT use the `query` parameter. This synthesises reasoning from stylistically connected albums in my history.
   4. **Get musical context & follow up**: Use `get_album_context` to see how this album fits musically. For any closely connected album (especially same artist, same style, or same era/format), call `get_album_detail` to read my actual review.
-  5. **Contextualise with statistics**: Call `get_taste_profile`. Use decade and genre averages as secondary, contextualising signals only — do not use them as the primary foundation for your prediction.
-  6. **Arc check (Optional)**: If I have a long history, use `get_listening_arc` to see if my taste has drifted recently.
+  5. **Format and character search**: Consider the album's primary experiential qualities — is it a live recording? An instrumental? Defined by a particular energy (raw aggression, atmosphere, complexity)? Run `search_project_history` to find albums sharing those qualities directly. For live albums specifically, always search "live" to establish a format-specific baseline — live album preferences often differ significantly from studio preferences and won't surface reliably from genre matching alone. Use the results to check whether any format-specific pattern overrides the genre-level signals.
+  6. **Contextualise with statistics**: Call `get_taste_profile`. Use decade and genre averages as secondary, contextualising signals only — do not use them as the primary foundation for your prediction.
+  7. **Arc check (Optional)**: If I have a long history, use `get_listening_arc` to see if my taste has drifted recently.
 
   **Signal Weighting**:
   When signals conflict, weight them in this order:
