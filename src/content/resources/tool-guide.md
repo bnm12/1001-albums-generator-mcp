@@ -75,28 +75,65 @@ controversial takes.
 
 ---
 
-## Using review insights for rating prediction
+### Predicting a rating for today's album
 
-Numerical rating tools (`get_taste_profile`, `get_rating_outliers`) tell you *what* a
-user rated. `get_review_insights` tells you *why* — which is often more predictive.
+**Step 1 — Identify the album**
 
-**Recommended workflow for `predict-my-rating`:**
+Call `get_album_of_the_day`. Extract the album name, UUID, genres, styles, and release
+year. Note the musical era the album actually belongs to — a 1950s artist recorded live
+in 1964 is not meaningfully a "60s album" despite the release date.
 
-1. `get_album_of_the_day` → get today's album name, genres, styles, artist
-2. `get_taste_profile` → baseline numerical picture
-3. `get_album_context` → artist arc and musical connections with their ratings
-4. `get_review_insights` with `albumIdentifier` = today's album → qualitative synthesis
-   of reviews from stylistically connected albums in the user's history
-5. Weigh the synthesis from step 4 alongside the numbers from steps 2–3.
-   When review reasoning and numerical scores conflict, the review reasoning is usually
-   the more reliable signal — a 2/5 with a review saying "I normally love this genre"
-   tells you more than the 2/5 alone.
+**Step 2 — Establish the user's taste character (do this before forming any hypothesis)**
 
-Note: `get_review_insights` attempts MCP Sampling but most clients including Claude
-Desktop do not currently support it. When sampling is unavailable, the tool returns the
-raw reviews with explicit synthesis instructions embedded in the response — follow those
-instructions to produce the synthesis yourself. Check `metadata.samplingUsed` to know
-which path ran. Either way, do not present the raw review block directly to the user.
+Call `get_rating_outliers`. Read the "overrated by user" list carefully — these are the
+albums the user loves more than the community, and they reveal what the user genuinely
+responds to. Look for recurring stylistic patterns: energy level, rawness, specific
+subgenres, era, format (live vs studio). This list is the most reliable predictor
+available and should frame all subsequent interpretation.
+
+**Step 3 — Get qualitative evidence from written reviews**
+
+Call `get_review_insights` with `albumIdentifier` set to today's album name or UUID (from
+step 1). Do NOT use the `query` parameter for prediction tasks — the album-anchored call
+pattern automatically finds reviews of related albums by genre, style, and artist. Treat
+the synthesised output as the primary qualitative signal.
+
+**Step 4 — Get musical context and follow up on connections**
+
+Call `get_album_context` with today's album name or UUID. This works even for unrated
+albums — see the tool description. Review the returned connections: artist arc, same-year
+companions, shared-genre albums. For any closely connected album — especially one sharing
+the same format (live/studio), style, or era — call `get_album_detail` to read the user's
+actual review. Do not rely on metadata alone; the review often contains specific language
+about what worked or didn't that metadata cannot capture.
+
+**Step 5 — Use aggregate statistics as context, not foundation**
+
+Call `get_taste_profile`. Use decade and genre averages as secondary, contextualising
+signals only — not as the basis of the prediction. Flag where they may be misleading:
+decade averages conflate musical era with recording date, genre labels are broad, and a
+single outlier album can skew averages significantly.
+
+**Step 6 — Arc check (optional, for long histories)**
+
+If the user has a long history and today's album sits outside their apparent comfort zone,
+call `get_listening_arc` to check whether recent taste has drifted toward or away from
+this style.
+
+**Signal weighting**
+
+When signals conflict, weight them in this order:
+1. **Rating outlier patterns** — reveals genuine enthusiasms and aversions, specific and reliable
+2. **Written reviews** (via `get_review_insights` and `get_album_detail`) — grounded in actual reactions, specific language is the strongest evidence
+3. **Genre/style affinities** from `get_taste_profile` — directionally useful but coarse
+4. **Decade averages** — treat with caution; easily confounded by era vs recording date mismatches
+
+**Confidence**
+
+Rate confidence higher when outlier patterns, review evidence, and genre data all point in
+the same direction. Rate it lower when they conflict, when the genre is underrepresented
+in the user's history (fewer than 5 rated albums in the relevant genre), or when the
+album has unusual characteristics that the user's history doesn't clearly address.
 
 **Recommended workflow for open taste questions:**
 
@@ -285,22 +322,65 @@ controversial takes.
 
 ---
 
-## Using review insights for rating prediction
+### Predicting a rating for today's album
 
-Numerical rating tools (`get_taste_profile`, `get_rating_outliers`) tell you *what* a
-user rated. `get_review_insights` tells you *why* — which is often more predictive.
+**Step 1 — Identify the album**
 
-**Recommended workflow for `predict-my-rating`:**
+Call `get_album_of_the_day`. Extract the album name, UUID, genres, styles, and release
+year. Note the musical era the album actually belongs to — a 1950s artist recorded live
+in 1964 is not meaningfully a "60s album" despite the release date.
 
-1. `get_album_of_the_day` → get today's album name, genres, styles, artist
-2. `get_taste_profile` → baseline numerical picture
-3. `get_album_context` → artist arc and musical connections with their ratings
-4. `get_review_insights` with `albumIdentifier` = today's album → qualitative synthesis
-   of reviews from stylistically connected albums in the user's history
-5. Weigh the synthesis from step 4 alongside the numbers from steps 2–3.
-   When review reasoning and numerical scores conflict, the review reasoning is usually
-   the more reliable signal — a 2/5 with a review saying "I normally love this genre"
-   tells you more than the 2/5 alone.
+**Step 2 — Establish the user's taste character (do this before forming any hypothesis)**
+
+Call `get_rating_outliers`. Read the "overrated by user" list carefully — these are the
+albums the user loves more than the community, and they reveal what the user genuinely
+responds to. Look for recurring stylistic patterns: energy level, rawness, specific
+subgenres, era, format (live vs studio). This list is the most reliable predictor
+available and should frame all subsequent interpretation.
+
+**Step 3 — Get qualitative evidence from written reviews**
+
+Call `get_review_insights` with `albumIdentifier` set to today's album name or UUID (from
+step 1). Do NOT use the `query` parameter for prediction tasks — the album-anchored call
+pattern automatically finds reviews of related albums by genre, style, and artist. Treat
+the synthesised output as the primary qualitative signal.
+
+**Step 4 — Get musical context and follow up on connections**
+
+Call `get_album_context` with today's album name or UUID. This works even for unrated
+albums — see the tool description. Review the returned connections: artist arc, same-year
+companions, shared-genre albums. For any closely connected album — especially one sharing
+the same format (live/studio), style, or era — call `get_album_detail` to read the user's
+actual review. Do not rely on metadata alone; the review often contains specific language
+about what worked or didn't that metadata cannot capture.
+
+**Step 5 — Use aggregate statistics as context, not foundation**
+
+Call `get_taste_profile`. Use decade and genre averages as secondary, contextualising
+signals only — not as the basis of the prediction. Flag where they may be misleading:
+decade averages conflate musical era with recording date, genre labels are broad, and a
+single outlier album can skew averages significantly.
+
+**Step 6 — Arc check (optional, for long histories)**
+
+If the user has a long history and today's album sits outside their apparent comfort zone,
+call `get_listening_arc` to check whether recent taste has drifted toward or away from
+this style.
+
+**Signal weighting**
+
+When signals conflict, weight them in this order:
+1. **Rating outlier patterns** — reveals genuine enthusiasms and aversions, specific and reliable
+2. **Written reviews** (via `get_review_insights` and `get_album_detail`) — grounded in actual reactions, specific language is the strongest evidence
+3. **Genre/style affinities** from `get_taste_profile` — directionally useful but coarse
+4. **Decade averages** — treat with caution; easily confounded by era vs recording date mismatches
+
+**Confidence**
+
+Rate confidence higher when outlier patterns, review evidence, and genre data all point in
+the same direction. Rate it lower when they conflict, when the genre is underrepresented
+in the user's history (fewer than 5 rated albums in the relevant genre), or when the
+album has unusual characteristics that the user's history doesn't clearly address.
 
 **Recommended workflow for open taste questions:**
 
@@ -398,4 +478,3 @@ type:
   `get_review_insights` will give you qualitative reasoning that is often more predictive
   than any rating-based tool. Always check `totalReviewedEntries` in the metadata — if
   it is greater than 0, the user has reviews worth consulting.
-
