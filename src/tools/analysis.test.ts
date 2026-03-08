@@ -288,7 +288,7 @@ describe("analysis tools", () => {
 
       const data = assertToolSuccess(result) as Record<string, unknown>;
       expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(false);
-      expect(String(data.synthesis)).toContain("Sampling is not available");
+      expect(String(data.synthesis)).toContain("Synthesise these reviews");
       expect(String(data.synthesis)).toContain("Loved the rhythm section");
     });
 

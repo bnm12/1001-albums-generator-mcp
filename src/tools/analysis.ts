@@ -569,9 +569,12 @@ PARAMETERS:
   divergence before the limit is applied, so the most informative reviews are always
   included first.
 
-REQUIRES SAMPLING: This tool uses MCP Sampling to synthesise reviews. If the connected
-client does not support sampling, a fallback response is returned containing the raw
-review entries instead of a synthesis — still useful, but less concise.
+NOTE ON SAMPLING: This tool attempts to use MCP Sampling to synthesise reviews. In
+practice, most MCP clients including Claude Desktop do not currently support sampling.
+When sampling is unavailable, the tool returns the raw review entries alongside
+explicit synthesis instructions for the calling agent to perform the synthesis directly.
+The output quality is equivalent either way — check \`metadata.samplingUsed\` to know
+which path ran.
 
 Returns a qualitative synthesis as plain text, plus metadata (how many reviews were found,
 how many were used, whether results were capped).`,
@@ -707,9 +710,18 @@ how many were used, whether results were capped).`,
         console.error("[get_review_insights] Sampling unavailable or failed:", samplingError);
 
         synthesis =
-          "Sampling is not available with the current client. " +
-          `Here are the ${context.selectedReviews.length} most relevant reviews for you to interpret directly:\n\n` +
-          reviewBlock;
+          `Here are the ${context.selectedReviews.length} most relevant reviews from this listener's history` +
+          (context.wasCapped ? ` (top ${limit} by community divergence)` : "") +
+          `.\n\n` +
+          `${reviewBlock}\n\n` +
+          `Synthesise these reviews into a concise qualitative insight (max 250 words) about ` +
+          `this listener's taste in the relevant area. Focus on:\n` +
+          `- What qualities, sounds, or characteristics they explicitly value or praise\n` +
+          `- What they dislike or criticise — be specific, not generic\n` +
+          `- Patterns in what makes them rate something higher or lower than the community\n` +
+          `- Contradictions or nuances (e.g. "loves jazz but dislikes free jazz")\n` +
+          `Do NOT summarise each album individually. Do NOT repeat the ratings. ` +
+          `Do NOT make generic statements that carry no signal.`;
         samplingUsed = false;
       }
 

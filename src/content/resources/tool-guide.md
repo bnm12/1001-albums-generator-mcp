@@ -92,10 +92,11 @@ user rated. `get_review_insights` tells you *why* — which is often more predic
    the more reliable signal — a 2/5 with a review saying "I normally love this genre"
    tells you more than the 2/5 alone.
 
-Note: `get_review_insights` uses MCP Sampling. If the client does not support sampling,
-the tool returns raw review text instead of a synthesis. In that case, treat the output
-as unprocessed review data and synthesise it yourself rather than presenting it directly.
-Always check whether a synthesis or raw text was returned before using the result.
+Note: `get_review_insights` attempts MCP Sampling but most clients including Claude
+Desktop do not currently support it. When sampling is unavailable, the tool returns the
+raw reviews with explicit synthesis instructions embedded in the response — follow those
+instructions to produce the synthesis yourself. Check `metadata.samplingUsed` to know
+which path ran. Either way, do not present the raw review block directly to the user.
 
 **Recommended workflow for open taste questions:**
 
@@ -222,9 +223,10 @@ type:
   `compare_projects` for any two arbitrary projects. Use `get_group_member_comparison`
   when the projects are group members and you need album-level rating divergence within
   that group context.
-- **Don't present raw `get_review_insights` output as a synthesis.** If MCP Sampling is
-  unavailable, the tool returns raw review text. Check whether the response is a
-  synthesised insight or unprocessed text before presenting it to the user.
+- **Always synthesise `get_review_insights` output before presenting it.** Whether
+  sampling ran or not, read `metadata.samplingUsed`. If `false`, the response contains
+  raw reviews with synthesis instructions — complete the synthesis before presenting
+  results to the user.
 
 ---
 
