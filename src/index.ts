@@ -4,8 +4,24 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 import { calculateProjectStats } from "./helpers.js";
 import { createMcpServer } from "./server.js";
+import { AlbumsGeneratorClient } from "./api.js";
+import { InMemoryCache, RedisCache } from "./cache.js";
 
 export { calculateProjectStats };
+
+const API_BASE_URL = process.env.API_BASE_URL || "https://1001albumsgenerator.com/api/v1";
+
+export const cache = process.env.REDIS_URL
+  ? new RedisCache(process.env.REDIS_URL)
+  : new InMemoryCache();
+
+if (process.env.REDIS_URL) {
+  console.error(`[cache] Redis enabled: ${process.env.REDIS_URL.replace(/:\/\/.*@/, '://***@')}`);
+} else {
+  console.error('[cache] Using in-memory cache');
+}
+
+export const defaultClient = new AlbumsGeneratorClient(API_BASE_URL, cache);
 
 async function main() {
   const mode = process.env.MCP_MODE || "stdio";
@@ -15,8 +31,17 @@ async function main() {
     const port = process.env.PORT || 3000;
     const transports = new Map<string, StreamableHTTPServerTransport>();
 
-    app.get("/healthz", (_req, res) => {
-      res.status(200).json({ status: "ok" });
+    app.get("/healthz", async (_req, res) => {
+      if (!(cache instanceof RedisCache)) {
+        return res.json({ status: 'ok' });
+      }
+
+      const redisOk = await cache.ping?.() ?? false;
+      if (redisOk) {
+        return res.json({ status: 'ok', redis: 'ok' });
+      } else {
+        return res.status(503).json({ status: 'degraded', redis: 'unavailable' });
+      }
     });
 
     app.all("/mcp", async (req, res, next) => {
@@ -43,7 +68,7 @@ async function main() {
             }
           };
 
-          const server = createMcpServer();
+          const server = createMcpServer(defaultClient);
           await server.connect(transport);
           await transport.handleRequest(req, res);
 
@@ -63,7 +88,7 @@ async function main() {
     });
   } else {
     const transport = new StdioServerTransport();
-    const server = createMcpServer();
+    const server = createMcpServer(defaultClient);
     await server.connect(transport);
     console.error("1001 Albums Generator MCP Server running on stdio");
   }

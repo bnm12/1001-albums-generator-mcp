@@ -113,19 +113,19 @@ in the group page URL). Data is cached for 4 hours.`,
     },
     async ({ type, projectIdentifier, groupSlug }) => {
       if (type === "global") {
-        client.invalidateGlobalStats();
+        await client.invalidateGlobalStats();
       } else if (type === "user") {
-        client.invalidateUserStats();
+        await client.invalidateUserStats();
       } else if (type === "project") {
         const pid = requireParam(projectIdentifier ?? "", "projectIdentifier");
         if (typeof pid === "object" && "error" in pid) return pid.response;
-        client.invalidateProject(pid);
+        await client.invalidateProject(pid);
       } else if (type === "group") {
         const gs = requireParam(groupSlug ?? "", "groupSlug");
         if (typeof gs === "object" && "error" in gs) return gs.response;
-        client.invalidateGroup(gs);
+        await client.invalidateGroup(gs);
       } else if (type === "all") {
-        client.clearCache();
+        await client.clearCache();
       }
 
       return { content: [{ type: "text", text: `Successfully invalidated ${type} cache.` }] };
