@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" width="120" alt="1001 Albums MCP Logo"/>
+  <img src="assets/logo.png" width="400" alt="1001 Albums MCP Logo"/>
 </p>
 
 <h1 align="center">1001 Albums Generator MCP</h1>
