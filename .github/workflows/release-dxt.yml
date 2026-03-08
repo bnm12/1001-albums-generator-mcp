@@ -46,8 +46,10 @@ jobs:
       - name: Pack Remote Extension
         run: |
           mkdir -p /tmp/remote-dxt/remote-shim
+          mkdir -p /tmp/remote-dxt/assets
           cp manifest-remote.json /tmp/remote-dxt/manifest.json
           cp remote-shim/index.js /tmp/remote-dxt/remote-shim/index.js
+          cp assets/logo.png /tmp/remote-dxt/assets/logo.png
           dxt pack /tmp/remote-dxt 1001-albums-generator-mcp-remote.dxt
 
       - name: Create Prerelease
