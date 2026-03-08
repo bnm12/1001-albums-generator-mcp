@@ -253,8 +253,100 @@ describe("project tools", () => {
     assertToolError(await testClient.client.callTool({ name: "get_album_context", arguments: { projectIdentifier: "", albumIdentifier: "x" } }), "projectIdentifier");
     assertToolError(await testClient.client.callTool({ name: "get_album_context", arguments: { projectIdentifier: "p1", albumIdentifier: "" } }), "albumIdentifier");
 
-    const notFound = await testClient.client.callTool({ name: "get_album_context", arguments: { projectIdentifier: "p1", albumIdentifier: "not-found" } });
+    mockClient.getGlobalStats.mockResolvedValueOnce({ albums: [] });
+    const notFound = await testClient.client.callTool({
+      name: "get_album_context",
+      arguments: { projectIdentifier: "p1", albumIdentifier: "not-found" },
+    });
     assertToolError(notFound, "not found");
+  });
+
+  it("resolves today's current album when not in history", async () => {
+    const currentAlbum = makeAlbum({ uuid: "today-uuid", name: "Today's Album", artist: "Artist A" });
+    mockClient.getProject.mockResolvedValue(
+      makeProjectInfo({
+        currentAlbum,
+        history: [
+          makeHistoryEntry({
+            album: makeAlbum({ uuid: "old-uuid", artist: "Artist A", name: "Old Album" }),
+          }),
+        ],
+      }),
+    );
+
+    const result = await testClient.client.callTool({
+      name: "get_album_context",
+      arguments: { projectIdentifier: "p1", albumIdentifier: "Today's Album" },
+    });
+
+    const data = assertToolSuccess(result) as any;
+    expect(data.targetAlbum.name).toBe("Today's Album");
+    expect(data.targetAlbum.userRating).toBeNull();
+    expect(data.listeningJourney).toEqual([]);
+    expect(data.communityDivergence.interpretation).toContain("today's current album");
+    // Artist arc should contain the other album by Artist A
+    expect(data.artistArc).toHaveLength(1);
+    expect(data.artistArc[0].album.name).toBe("Old Album");
+  });
+
+  it("computes artistArc from history even when target is currentAlbum", async () => {
+    const currentAlbum = makeAlbum({ uuid: "today-uuid", name: "Today", artist: "Same Artist" });
+    mockClient.getProject.mockResolvedValue(
+      makeProjectInfo({
+        currentAlbum,
+        history: [
+          makeHistoryEntry({ album: makeAlbum({ uuid: "h1", artist: "Same Artist", name: "H1" }) }),
+        ],
+      }),
+    );
+
+    const result = await testClient.client.callTool({
+      name: "get_album_context",
+      arguments: { projectIdentifier: "p1", albumIdentifier: "today" },
+    });
+    const data = assertToolSuccess(result) as any;
+    expect(data.artistArc).toHaveLength(1);
+    expect(data.artistArc[0].album.name).toBe("H1");
+  });
+
+  it("falls back to global stats when album not in history or currentAlbum", async () => {
+    mockClient.getProject.mockResolvedValue(makeProjectInfo({ history: [], currentAlbum: null }));
+    mockClient.getGlobalStats.mockResolvedValue({
+      albums: [
+        {
+          name: "Global Album",
+          artist: "Global Artist",
+          averageRating: 4.2,
+          genres: ["Jazz"],
+          votes: 100,
+          controversialScore: 0,
+        },
+      ],
+    });
+
+    const result = await testClient.client.callTool({
+      name: "get_album_context",
+      arguments: { projectIdentifier: "p1", albumIdentifier: "Global Album" },
+    });
+
+    const data = assertToolSuccess(result) as any;
+    expect(data.targetAlbum.name).toBe("Global Album");
+    expect(data.targetAlbum.globalRating).toBe(4.2);
+    expect(data.communityDivergence.interpretation).toContain("not in the project's history");
+  });
+
+  it("returns not-found error when album missing from history, currentAlbum, and global stats", async () => {
+    mockClient.getProject.mockResolvedValue(makeProjectInfo({ history: [], currentAlbum: null }));
+    mockClient.getGlobalStats.mockResolvedValue({ albums: [] });
+
+    const result = await testClient.client.callTool({
+      name: "get_album_context",
+      arguments: { projectIdentifier: "p1", albumIdentifier: "Unknown" },
+    });
+    assertToolError(result, "not found");
+    expect(getToolResponseText(result)).toContain(
+      "not found in project history, current album, or global stats",
+    );
   });
 
   describe("API error handling", () => {

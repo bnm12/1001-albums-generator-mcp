@@ -160,17 +160,7 @@ and decide whether to fetch more.`,
 
   registerTool(
     "get_album_context",
-    `Returns rich contextual data for a specific album within a project's history, across four dimensions:
-
-1. ARTIST ARC: All other albums by the same artist in the user's history, sorted chronologically by release date, with the user's rating and global rating for each. Use this to discuss an artist's career trajectory as heard by this user — e.g. "you rated their earlier work higher" or "this was their most acclaimed album but you disagreed".
-
-2. MUSICAL CONNECTIONS: Albums in the history sharing genres or styles with the target album, grouped by how many dimensions they share (both genre and style = stronger connection). Use this to identify clusters of related listening and discuss musical lineage or recurring taste patterns.
-
-3. COMMUNITY DIVERGENCE: The difference between the user's rating and the global community average for this album. Also provides the user's mean divergence across all rated albums as a baseline, so you can say whether this album is unusually loved/hated relative to the user's typical behaviour. A positive divergence means the user rated it higher than the community; negative means lower.
-
-4. LISTENING JOURNEY: The 3 albums generated immediately before and after this one in the user's history (by generatedAt date), with ratings. Use this to give a sense of what the user was experiencing around this album — e.g. "you were on a strong run of jazz albums" or "this came right after your lowest-rated album".
-
-Identify the target album using its name, UUID, or generatedAlbumId (from list_project_history or search_project_history). Requires a projectIdentifier. Data is cached for 4 hours.`,
+    `Identify the target album using its name, UUID, or generatedAlbumId. The tool searches in order: project history, today's current album, then the global book stats. This means it works for today's assigned album even before it has been rated — pass the album name or UUID from \`get_album_of_the_day\` directly. Artist arc and musical connections are always computed from history regardless of where the target album was found. Listening journey and community divergence are only available for albums in history.`,
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
       albumIdentifier: z.string().describe("The name, UUID, or generatedAlbumId of the album to contextualize"),
@@ -182,30 +172,119 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
       if (typeof aid === "object" && "error" in aid) return aid.response;
       const project = await client.getProject(pid);
       const lowerId = aid.toLowerCase();
-      const targetEntry = project.history.find((h) => h.album.name.toLowerCase() === lowerId || h.album.uuid === albumIdentifier || h.generatedAlbumId === albumIdentifier);
 
-      if (!targetEntry) {
-        return { content: [{ type: "text", text: `Album "${albumIdentifier}" not found in project history.` }] };
+      let targetAlbum: any = null;
+      let targetUuid: string | null = null;
+      let targetGeneratedAlbumId: string | null = null;
+      let userRating: number | null = null;
+      let globalRating: number | null = null;
+      let albumDivergence: number | null = null;
+      let listeningJourney: any[] = [];
+      let interpretation: string | null = null;
+
+      // 1. Project history lookup
+      const targetEntry = project.history.find(
+        (h) =>
+          h.album.name.toLowerCase() === lowerId ||
+          h.album.uuid === albumIdentifier ||
+          h.generatedAlbumId === albumIdentifier,
+      );
+
+      if (targetEntry) {
+        targetAlbum = targetEntry.album;
+        targetUuid = targetAlbum.uuid;
+        targetGeneratedAlbumId = targetEntry.generatedAlbumId;
+        userRating = typeof targetEntry.rating === "number" ? targetEntry.rating : null;
+        globalRating = targetEntry.globalRating ?? null;
+        albumDivergence =
+          userRating !== null && globalRating !== null
+            ? Math.round((userRating - globalRating) * 100) / 100
+            : null;
+
+        const sortedHistory = [...project.history].sort((a, b) =>
+          (a.generatedAt ?? "").localeCompare(b.generatedAt ?? ""),
+        );
+        const targetIndex = sortedHistory.findIndex(
+          (h) => h.generatedAlbumId === targetGeneratedAlbumId,
+        );
+        listeningJourney = sortedHistory
+          .slice(Math.max(0, targetIndex - 3), targetIndex + 4)
+          .filter((h) => h.generatedAlbumId !== targetGeneratedAlbumId)
+          .map((h) => ({
+            ...slimHistoryEntry(h),
+            position: sortedHistory.indexOf(h) < targetIndex ? "before" : "after",
+          }));
+      }
+      // 2. Current album lookup
+      else if (
+        project.currentAlbum &&
+        (project.currentAlbum.name.toLowerCase() === lowerId ||
+          project.currentAlbum.uuid === albumIdentifier)
+      ) {
+        targetAlbum = project.currentAlbum;
+        targetUuid = targetAlbum.uuid;
+        interpretation = "This is today's current album — it has not been rated yet";
+      }
+      // 3. Global stats fallback
+      else {
+        const stats = await client.getGlobalStats();
+        const isUuid =
+          /^[0-9a-fA-F]{24}$/.test(albumIdentifier) ||
+          /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+            albumIdentifier,
+          );
+        const statMatch = isUuid ? null : stats.albums.find((a) => a.name.toLowerCase() === lowerId);
+
+        if (statMatch) {
+          targetAlbum = {
+            name: statMatch.name,
+            artist: statMatch.artist,
+            releaseDate: statMatch.releaseDate || "",
+            genres: statMatch.genres,
+            styles: [], // AlbumStat doesn't have styles
+          };
+          globalRating = statMatch.averageRating;
+          interpretation =
+            "This album is not in the project's history. Community rating is from global stats only.";
+        }
       }
 
-      const targetAlbum = targetEntry.album;
+      if (!targetAlbum) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Album "${albumIdentifier}" not found in project history, current album, or global stats.`,
+            },
+          ],
+        };
+      }
+
       const history = project.history;
-      const userRating = typeof targetEntry.rating === "number" ? targetEntry.rating : null;
-      const globalRating = targetEntry.globalRating ?? null;
-      const albumDivergence = userRating !== null && globalRating !== null ? Math.round((userRating - globalRating) * 100) / 100 : null;
-      const ratedWithGlobal = getRatedEntries(history).filter((h) => typeof h.globalRating === "number");
-      const meanDivergence = ratedWithGlobal.length > 0 ? Math.round((ratedWithGlobal.reduce((sum, h) => sum + (h.rating - (h.globalRating as number)), 0) / ratedWithGlobal.length) * 100) / 100 : null;
+      const ratedWithGlobal = getRatedEntries(history).filter(
+        (h) => typeof h.globalRating === "number",
+      );
+      const meanDivergence =
+        ratedWithGlobal.length > 0
+          ? Math.round(
+              (ratedWithGlobal.reduce((sum, h) => sum + (h.rating - (h.globalRating as number)), 0) /
+                ratedWithGlobal.length) *
+                100,
+            ) / 100
+          : null;
 
       const artistArc = history
-        .filter((h) => h.album.artist === targetAlbum.artist && h.album.uuid !== targetAlbum.uuid)
+        .filter((h) => h.album.artist === targetAlbum.artist && h.album.uuid !== targetUuid)
         .sort((a, b) => getYear(a.album.releaseDate) - getYear(b.album.releaseDate))
         .map((h) => ({ ...slimHistoryEntry(h) }));
 
       const musicalConnections = history
-        .filter((h) => h.album.uuid !== targetAlbum.uuid)
+        .filter((h) => h.album.uuid !== targetUuid)
         .map((h) => {
           const sharedGenres = h.album.genres.filter((g) => targetAlbum.genres.includes(g));
-          const sharedStyles = (h.album.styles ?? []).filter((s) => (targetAlbum.styles ?? []).includes(s));
+          const sharedStyles = (h.album.styles ?? []).filter((s: string) =>
+            (targetAlbum.styles ?? []).includes(s),
+          );
           return {
             ...slimAlbum(h.album),
             sharedGenres,
@@ -217,44 +296,56 @@ Identify the target album using its name, UUID, or generatedAlbumId (from list_p
         .sort((a, b) => b.connectionStrength - a.connectionStrength)
         .slice(0, 20);
 
-      const sortedHistory = [...history].sort((a, b) => (a.generatedAt ?? "").localeCompare(b.generatedAt ?? ""));
-      const targetIndex = sortedHistory.findIndex((h) => h.generatedAlbumId === targetEntry.generatedAlbumId);
-      const journeyWindow = sortedHistory
-        .slice(Math.max(0, targetIndex - 3), targetIndex + 4)
-        .filter((h) => h.generatedAlbumId !== targetEntry.generatedAlbumId)
-        .map((h) => ({
-          ...slimHistoryEntry(h),
-          position: sortedHistory.indexOf(h) < targetIndex ? "before" : "after",
-        }));
+      if (interpretation === null) {
+        interpretation =
+          albumDivergence !== null && meanDivergence !== null
+            ? albumDivergence > meanDivergence + 0.5
+              ? "User rated this notably higher than their usual divergence from the community"
+              : albumDivergence < meanDivergence - 0.5
+                ? "User rated this notably lower than their usual divergence from the community"
+                : "User divergence on this album is consistent with their typical pattern"
+            : null;
+      }
 
       const context = {
-        targetAlbum: { name: targetAlbum.name, artist: targetAlbum.artist, releaseDate: targetAlbum.releaseDate, genres: targetAlbum.genres, styles: targetAlbum.styles, userRating, globalRating },
+        targetAlbum: {
+          name: targetAlbum.name,
+          artist: targetAlbum.artist,
+          releaseDate: targetAlbum.releaseDate,
+          genres: targetAlbum.genres,
+          styles: targetAlbum.styles,
+          userRating,
+          globalRating,
+        },
         communityDivergence: {
           albumDivergence,
           userMeanDivergence: meanDivergence,
-          interpretation:
-            albumDivergence !== null && meanDivergence !== null
-              ? albumDivergence > meanDivergence + 0.5
-                ? "User rated this notably higher than their usual divergence from the community"
-                : albumDivergence < meanDivergence - 0.5
-                  ? "User rated this notably lower than their usual divergence from the community"
-                  : "User divergence on this album is consistent with their typical pattern"
-              : null,
+          interpretation,
         },
         artistArc,
         musicalConnections,
-        listeningJourney: journeyWindow,
+        listeningJourney,
         sameArtist: artistArc,
         sameYear: history
-          .filter((h) => getYear(h.album.releaseDate) === getYear(targetAlbum.releaseDate) && h.album.uuid !== targetAlbum.uuid)
+          .filter(
+            (h) =>
+              getYear(h.album.releaseDate) === getYear(targetAlbum.releaseDate) &&
+              h.album.uuid !== targetUuid,
+          )
           .map((h) => slimAlbum(h.album))
           .slice(0, 50),
         relatedByParticipatingArtists: history
           .filter((h) => {
-            if (h.album.uuid === targetAlbum.uuid) return false;
-            const targetArtists = targetAlbum.artist.split(/&|,|and|with/i).map((s) => s.trim()).filter(Boolean);
-            const otherArtists = h.album.artist.split(/&|,|and|with/i).map((s) => s.trim()).filter(Boolean);
-            return targetArtists.some((ta) => otherArtists.includes(ta));
+            if (h.album.uuid === targetUuid) return false;
+            const targetArtists = targetAlbum.artist
+              .split(/&|,|and|with/i)
+              .map((s: string) => s.trim())
+              .filter(Boolean);
+            const otherArtists = h.album.artist
+              .split(/&|,|and|with/i)
+              .map((s: string) => s.trim())
+              .filter(Boolean);
+            return targetArtists.some((ta: string) => otherArtists.includes(ta));
           })
           .map((h) => slimAlbum(h.album)),
       };
