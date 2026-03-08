@@ -1,8 +1,52 @@
-<svg width="220" height="220" viewBox="0 0 220 220"
-    xmlns="http://www.w3.org/2000/svg">
-    <circle cx="110" cy="110" r="100" fill="#111"/>
-    <circle cx="110" cy="110" r="70" fill="#1e1e1e"/>
-    <circle cx="110" cy="110" r="40" fill="#2b2b2b"/>
-    <circle cx="110" cy="110" r="12" fill="#e63946"/>
-    <text x="110" y="115" font-family="monospace" font-size="24" fill="white" text-anchor="middle"> 1001 </text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="140" height="140">
+    <defs>
+        <radialGradient id="vinyl" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#1a1a2e"/>
+            <stop offset="40%" stop-color="#16213e"/>
+            <stop offset="100%" stop-color="#0f0f1a"/>
+        </radialGradient>
+        <radialGradient id="label" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#e8c547"/>
+            <stop offset="100%" stop-color="#c9a227"/>
+        </radialGradient>
+        <radialGradient id="groove1" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="transparent"/>
+            <stop offset="85%" stop-color="#2a2a4a" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#2a2a4a" stop-opacity="0.3"/>
+        </radialGradient>
+    </defs>
+
+    <!-- Outer vinyl disc -->
+    <circle cx="70" cy="70" r="66" fill="url(#vinyl)" stroke="#2d2d5a" stroke-width="1"/>
+
+    <!-- Groove rings -->
+    <circle cx="70" cy="70" r="62" fill="none" stroke="#1e1e3d" stroke-width="0.5" opacity="0.8"/>
+    <circle cx="70" cy="70" r="57" fill="none" stroke="#1e1e3d" stroke-width="0.4" opacity="0.7"/>
+    <circle cx="70" cy="70" r="52" fill="none" stroke="#1e1e3d" stroke-width="0.4" opacity="0.6"/>
+    <circle cx="70" cy="70" r="47" fill="none" stroke="#1e1e3d" stroke-width="0.3" opacity="0.5"/>
+    <circle cx="70" cy="70" r="42" fill="none" stroke="#252550" stroke-width="0.6" opacity="0.6"/>
+
+    <!-- Center label -->
+    <circle cx="70" cy="70" r="22" fill="url(#label)"/>
+    <circle cx="70" cy="70" r="20" fill="none" stroke="#b8921f" stroke-width="0.5" opacity="0.5"/>
+
+    <!-- Spindle hole -->
+    <circle cx="70" cy="70" r="3.5" fill="#0f0f1a"/>
+
+    <!-- Equalizer bars inside the label -->
+    <!-- Bar 1 -->
+    <rect x="51" y="64" width="4" height="12" rx="1" fill="#1a1a2e" opacity="0.7"/>
+    <!-- Bar 2 -->
+    <rect x="57" y="60" width="4" height="16" rx="1" fill="#1a1a2e" opacity="0.7"/>
+    <!-- Bar 3 -->
+    <rect x="63" y="66" width="4" height="10" rx="1" fill="#1a1a2e" opacity="0.7"/>
+    <!-- Bar 4 -->
+    <rect x="69" y="57" width="4" height="19" rx="1" fill="#1a1a2e" opacity="0.7"/>
+    <!-- Bar 5 -->
+    <rect x="75" y="62" width="4" height="14" rx="1" fill="#1a1a2e" opacity="0.7"/>
+    <!-- Bar 6 -->
+    <rect x="81" y="67" width="4" height="9" rx="1" fill="#1a1a2e" opacity="0.7"/>
+
+    <!-- Highlight arc on vinyl -->
+    <path d="M 22 55 A 50 50 0 0 1 70 20" fill="none" stroke="white" stroke-width="1.5" opacity="0.06" stroke-linecap="round"/>
 </svg>
