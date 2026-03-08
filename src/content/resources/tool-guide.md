@@ -48,6 +48,11 @@ user's history. It returns four dimensions:
 
 Identify the album by name, UUID, or `generatedAlbumId` from `list_project_history`.
 
+`get_album_context` also works for today's current album — pass the album name or UUID
+from `get_album_of_the_day` directly. The artist arc and musical connections will still
+be computed from your history. Listening journey and personal divergence will be null
+since the album hasn't been rated yet.
+
 ---
 
 ## Taste analysis
@@ -250,6 +255,11 @@ user's history. It returns four dimensions:
 4. Listening journey — the 3 albums before and after in chronological order
 
 Identify the album by name, UUID, or \`generatedAlbumId\` from \`list_project_history\`.
+
+\`get_album_context\` also works for today's current album — pass the album name or UUID
+from \`get_album_of_the_day\` directly. The artist arc and musical connections will still
+be computed from your history. Listening journey and personal divergence will be null
+since the album hasn't been rated yet.
 
 ---
 
