@@ -6,7 +6,7 @@ This repository contains an MCP server for the 1001 Albums Generator API.
 
 1. **Respect Rate Limits**: The API is strictly limited to 3 requests per minute.
    - The `AlbumsGeneratorClient` in `src/api.ts` implements a `throttle()` method that enforces a 20-second delay between requests. **Do not remove or reduce this delay.**
-   - Responses are cached in-memory for 4 hours.
+   - Responses are cached for 4 hours via a swappable `CacheStore` (see **Cache Layer** below).
    - The `AlbumsGeneratorClient` instance is shared across all sessions (module-level singleton). This is intentional — the shared cache and throttle queue benefit all concurrent sessions.
 2. **ESM Implementation**: This is a Node.js ESM project.
    - Always use `.js` extensions in relative imports (e.g., `import { ... } from "./api.js"`).
@@ -48,7 +48,8 @@ Until then, this server is intentionally read-only with respect to user data.
 
 ## Code Structure
 
-- `src/api.ts`: Contains the `AlbumsGeneratorClient` with throttling, caching, and data types.
+- `src/api.ts`: Contains the `AlbumsGeneratorClient` with throttling and data types.
+- `src/cache.ts`: Contains the `CacheStore` interface and `InMemoryCache`/`RedisCache` implementations.
 - `src/index.ts`: The MCP server entry point. Contains:
   - `createMcpServer()` — factory function that creates a new `McpServer` instance and registers all tools, prompts, and resources on it. Must be called once per session in HTTP mode, and once in stdio mode.
   - `main()` — starts the server in either `stdio` or `sse` (Streamable HTTP) mode based on the `MCP_MODE` environment variable.
@@ -154,6 +155,30 @@ values:
 - `"project"` → specific project cache (`/projects/:id`)
 - `"group"` → specific group cache (`/groups/:slug`)
 - `"all"` → clears all caches
+
+## Cache Layer
+
+The server uses a swappable cache layer defined in `src/cache.ts`:
+
+- **`InMemoryCache`** (default): Stores data in an in-process Map. Used if `REDIS_URL` is not set.
+- **`RedisCache`**: Used if `REDIS_URL` is configured. Connects via `ioredis`.
+
+### Key Scheme
+All keys are prefixed with `1001mcp:` to allow sharing a Redis instance:
+- `1001mcp:global`
+- `1001mcp:user`
+- `1001mcp:project:{identifier}`
+- `1001mcp:group:{slug}`
+- `1001mcp:groupalbum:{slug}:{uuid}`
+
+### Failure Mode
+Redis operations are wrapped in try/catch. If Redis is down or slow, the client logs the error and falls through to the upstream API. The server degrades to uncached behavior rather than crashing.
+
+### Health Check
+In HTTP mode, `/healthz` includes a `redis` field when configured. It returns HTTP 503 `degraded` if Redis is unreachable.
+
+### Throttle Queue
+The throttle queue is intentionally **not** in Redis. It is a promise chain on the in-process singleton and does not need to be shared across server instances.
 
 ## HTTP Transport Architecture
 

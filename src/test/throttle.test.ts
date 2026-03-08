@@ -245,7 +245,7 @@ describe("cache behaviour", () => {
     expect(get).toHaveBeenCalledTimes(2);
 
     // Invalidate only alpha.
-    client.invalidateProject("alpha");
+    await client.invalidateProject("alpha");
 
     await client.getProject("alpha"); // should re-fetch
     await client.getProject("beta"); // still cached
@@ -261,7 +261,7 @@ describe("cache behaviour", () => {
     await client.getUserAlbumStats();
     expect(get).toHaveBeenCalledTimes(2);
 
-    client.clearCache();
+    await client.clearCache();
 
     await client.getGlobalStats();
     await client.getUserAlbumStats();

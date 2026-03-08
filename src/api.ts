@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { CacheStore, InMemoryCache, CacheKeys } from './cache.js';
 
 export interface Album {
   uuid: string;
@@ -90,27 +91,21 @@ export interface GroupAlbumReviews {
   reviews: GroupAlbumReview[];
 }
 
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-}
-
 export class AlbumsGeneratorClient {
   private axiosInstance: AxiosInstance;
   private throttlePromise: Promise<void> = Promise.resolve();
   private readonly MIN_REQUEST_INTERVAL = 20000; // 3 requests per minute = 1 request every 20 seconds
   private readonly CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+  private cache: CacheStore;
 
-  private globalStatsCache: CacheEntry<GlobalStats> | null = null;
-  private userStatsCache: CacheEntry<UserAlbumStats> | null = null;
-  private projectsCache: Map<string, CacheEntry<ProjectInfo>> = new Map();
-  private groupsCache: Map<string, CacheEntry<GroupInfo>> = new Map();
-  private groupAlbumReviewsCache: Map<string, CacheEntry<GroupAlbumReviews>> = new Map();
-
-  constructor(baseURL: string = 'https://1001albumsgenerator.com/api/v1') {
+  constructor(
+    baseURL: string = 'https://1001albumsgenerator.com/api/v1',
+    cache?: CacheStore,
+  ) {
     this.axiosInstance = axios.create({
       baseURL,
     });
+    this.cache = cache ?? new InMemoryCache();
   }
 
   private async throttle() {
@@ -123,56 +118,85 @@ export class AlbumsGeneratorClient {
     await currentThrottle;
   }
 
-  private isCacheValid<T>(entry: CacheEntry<T> | null | undefined): entry is CacheEntry<T> {
-    if (!entry) return false;
-    return Date.now() - entry.timestamp < this.CACHE_TTL;
-  }
-
   async getGlobalStats(forceRefresh = false): Promise<GlobalStats> {
-    if (!forceRefresh && this.isCacheValid(this.globalStatsCache)) {
-      return this.globalStatsCache.data;
+    if (!forceRefresh) {
+      try {
+        const cached = await this.cache.get<GlobalStats>(CacheKeys.global);
+        if (cached) return cached;
+      } catch (err) {
+        console.error('[cache] get error for global stats, falling through to API:', err);
+      }
     }
+
     await this.throttle();
     const response = await this.axiosInstance.get('/albums/stats');
-    this.globalStatsCache = {
-      data: response.data,
-      timestamp: Date.now(),
-    };
-    return response.data;
+    const result = response.data;
+
+    try {
+      await this.cache.set(CacheKeys.global, result, this.CACHE_TTL);
+    } catch (err) {
+      console.error('[cache] set error for global stats, continuing without caching:', err);
+    }
+
+    return result;
   }
 
   async getUserAlbumStats(forceRefresh = false): Promise<UserAlbumStats> {
-    if (!forceRefresh && this.isCacheValid(this.userStatsCache)) {
-      return this.userStatsCache.data;
+    if (!forceRefresh) {
+      try {
+        const cached = await this.cache.get<UserAlbumStats>(CacheKeys.user);
+        if (cached) return cached;
+      } catch (err) {
+        console.error('[cache] get error for user stats, falling through to API:', err);
+      }
     }
+
     await this.throttle();
     const response = await this.axiosInstance.get('/user-albums/stats');
-    this.userStatsCache = {
-      data: response.data,
-      timestamp: Date.now(),
-    };
-    return response.data;
+    const result = response.data;
+
+    try {
+      await this.cache.set(CacheKeys.user, result, this.CACHE_TTL);
+    } catch (err) {
+      console.error('[cache] set error for user stats, continuing without caching:', err);
+    }
+
+    return result;
   }
 
   async getProject(projectIdentifier: string, forceRefresh = false): Promise<ProjectInfo> {
-    const cached = this.projectsCache.get(projectIdentifier);
-    if (!forceRefresh && this.isCacheValid(cached)) {
-      return cached.data;
+    if (!forceRefresh) {
+      try {
+        const cached = await this.cache.get<ProjectInfo>(CacheKeys.project(projectIdentifier));
+        if (cached) return cached;
+      } catch (err) {
+        console.error(`[cache] get error for project ${projectIdentifier}, falling through to API:`, err);
+      }
     }
+
     await this.throttle();
     const response = await this.axiosInstance.get(`/projects/${projectIdentifier}`);
-    this.projectsCache.set(projectIdentifier, {
-      data: response.data,
-      timestamp: Date.now(),
-    });
-    return response.data;
+    const result = response.data;
+
+    try {
+      await this.cache.set(CacheKeys.project(projectIdentifier), result, this.CACHE_TTL);
+    } catch (err) {
+      console.error(`[cache] set error for project ${projectIdentifier}, continuing without caching:`, err);
+    }
+
+    return result;
   }
 
   async getGroup(groupSlug: string, forceRefresh = false): Promise<GroupInfo> {
-    const cached = this.groupsCache.get(groupSlug);
-    if (!forceRefresh && this.isCacheValid(cached)) {
-      return cached.data;
+    if (!forceRefresh) {
+      try {
+        const cached = await this.cache.get<GroupInfo>(CacheKeys.group(groupSlug));
+        if (cached) return cached;
+      } catch (err) {
+        console.error(`[cache] get error for group ${groupSlug}, falling through to API:`, err);
+      }
     }
+
     await this.throttle();
     const response = await this.axiosInstance.get(`/groups/${groupSlug}`);
     const data = response.data;
@@ -260,10 +284,12 @@ export class AlbumsGeneratorClient {
 
     await Promise.all(voteFetchers);
 
-    this.groupsCache.set(groupSlug, {
-      data: groupInfo,
-      timestamp: Date.now(),
-    });
+    try {
+      await this.cache.set(CacheKeys.group(groupSlug), groupInfo, this.CACHE_TTL);
+    } catch (err) {
+      console.error(`[cache] set error for group ${groupSlug}, continuing without caching:`, err);
+    }
+
     return groupInfo;
   }
 
@@ -272,11 +298,16 @@ export class AlbumsGeneratorClient {
     albumUuid: string,
     forceRefresh = false
   ): Promise<GroupAlbumReviews> {
-    const cacheKey = `${groupSlug}:${albumUuid}`;
-    const cached = this.groupAlbumReviewsCache.get(cacheKey);
-    if (!forceRefresh && this.isCacheValid(cached)) {
-      return cached.data;
+    const cacheKey = CacheKeys.groupAlbum(groupSlug, albumUuid);
+    if (!forceRefresh) {
+      try {
+        const cached = await this.cache.get<GroupAlbumReviews>(cacheKey);
+        if (cached) return cached;
+      } catch (err) {
+        console.error(`[cache] get error for group album reviews ${cacheKey}, falling through to API:`, err);
+      }
     }
+
     await this.throttle();
     const response = await this.axiosInstance.get(`/groups/${groupSlug}/albums/${albumUuid}`);
     const data = response.data;
@@ -300,40 +331,53 @@ export class AlbumsGeneratorClient {
       })),
     };
 
-    this.groupAlbumReviewsCache.set(cacheKey, {
-      data: albumReviews,
-      timestamp: Date.now(),
-    });
+    try {
+      await this.cache.set(cacheKey, albumReviews, this.CACHE_TTL);
+    } catch (err) {
+      console.error(`[cache] set error for group album reviews ${cacheKey}, continuing without caching:`, err);
+    }
+
     return albumReviews;
   }
 
-  invalidateGlobalStats() {
-    this.globalStatsCache = null;
-  }
-
-  invalidateUserStats() {
-    this.userStatsCache = null;
-  }
-
-  invalidateProject(projectIdentifier: string) {
-    this.projectsCache.delete(projectIdentifier);
-  }
-
-  invalidateGroup(groupSlug: string) {
-    this.groupsCache.delete(groupSlug);
-    // Also invalidate any associated album reviews for this group
-    for (const key of this.groupAlbumReviewsCache.keys()) {
-      if (key.startsWith(`${groupSlug}:`)) {
-        this.groupAlbumReviewsCache.delete(key);
-      }
+  async invalidateGlobalStats(): Promise<void> {
+    try {
+      await this.cache.delete(CacheKeys.global);
+    } catch (err) {
+      console.error('[cache] delete error for global stats:', err);
     }
   }
 
-  clearCache() {
-    this.globalStatsCache = null;
-    this.userStatsCache = null;
-    this.projectsCache.clear();
-    this.groupsCache.clear();
-    this.groupAlbumReviewsCache.clear();
+  async invalidateUserStats(): Promise<void> {
+    try {
+      await this.cache.delete(CacheKeys.user);
+    } catch (err) {
+      console.error('[cache] delete error for user stats:', err);
+    }
+  }
+
+  async invalidateProject(projectIdentifier: string): Promise<void> {
+    try {
+      await this.cache.delete(CacheKeys.project(projectIdentifier));
+    } catch (err) {
+      console.error(`[cache] delete error for project ${projectIdentifier}:`, err);
+    }
+  }
+
+  async invalidateGroup(groupSlug: string): Promise<void> {
+    try {
+      await this.cache.delete(CacheKeys.group(groupSlug));
+      await this.cache.deleteByPrefix(CacheKeys.groupAlbumPrefix(groupSlug));
+    } catch (err) {
+      console.error(`[cache] delete error for group ${groupSlug}:`, err);
+    }
+  }
+
+  async clearCache(): Promise<void> {
+    try {
+      await this.cache.clearAll();
+    } catch (err) {
+      console.error('[cache] clear error:', err);
+    }
   }
 }
