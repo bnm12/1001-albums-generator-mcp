@@ -9,8 +9,7 @@
  *  5. Confirm the singleton shared across HTTP sessions is the same instance.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import axios from "axios";
+import { describe, expect, it, vi } from "vitest";
 import type { AxiosInstance } from "axios";
 import { AlbumsGeneratorClient } from "../api.js";
 
@@ -60,7 +59,7 @@ describe("throttle queue serialisation", () => {
     const client = makeClient(10);
     const callOrder: number[] = [];
 
-    const get = vi.fn().mockImplementation((_url: string) => {
+    const get = vi.fn().mockImplementation(() => {
       // Each call records its start time; the test checks they don't overlap.
       callOrder.push(Date.now());
       return Promise.resolve({ data: { albums: [] } });
