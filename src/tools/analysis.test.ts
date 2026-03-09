@@ -312,6 +312,86 @@ describe("analysis tools", () => {
       expect(String(data.synthesis)).toContain("Synthesise these reviews");
     });
 
+    it("falls back when stopReason is maxTokens even if text is non-empty", async () => {
+      const history = [
+        makeHistoryEntry({ review: "Great album.", rating: 5 }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      await testClient.cleanup();
+      testClient = await createTestClient(mockClient, {
+        sampling: {
+          createMessage: async () => ({
+            role: "assistant",
+            content: { type: "text", text: "Partial synth" },
+            stopReason: "maxTokens",
+          }),
+        },
+      });
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(false);
+      expect(String(data.synthesis)).toContain("Synthesise these reviews");
+      expect(String(data.synthesis)).not.toContain("Partial synth");
+    });
+
+    it("falls back when sampling throws", async () => {
+      const history = [
+        makeHistoryEntry({ review: "Great album.", rating: 5 }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      await testClient.cleanup();
+      testClient = await createTestClient(mockClient, {
+        sampling: {
+          createMessage: async () => {
+            throw new Error("sampling unavailable");
+          },
+        },
+      });
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(false);
+      expect(String(data.synthesis)).toContain("Synthesise these reviews");
+    });
+
+    it("falls back when content type is not text", async () => {
+      const history = [
+        makeHistoryEntry({ review: "Great album.", rating: 5 }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      await testClient.cleanup();
+      testClient = await createTestClient(mockClient, {
+        sampling: {
+          createMessage: async () => ({
+            role: "assistant",
+            content: { type: "image", data: "...", mimeType: "image/png" } as any,
+            stopReason: "endTurn",
+          }),
+        },
+      });
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(false);
+      expect(String(data.synthesis)).toContain("Synthesise these reviews");
+    });
+
     it("falls back with raw reviews when sampling unavailable", async () => {
       await testClient.cleanup();
       testClient = await createTestClient(mockClient, {});
