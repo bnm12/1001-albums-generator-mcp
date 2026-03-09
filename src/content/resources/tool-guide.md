@@ -3,8 +3,10 @@
 ## Orientation: start here
 
 Before answering any question about a user's listening history or taste, orient yourself
-with one of these two tools:
+with one of these tools:
 
+- **`get_tool_guide`** — full workflow guidance for this server. Call this at the start
+  of any complex task to see recommended tool sequences and signal weighting.
 - **`get_project_stats`** — quick summary of a project: how many albums generated, rated,
   unrated, current album. Use when the question is about progress or status. Also use this
   first to check `albumsGenerated` before launching any heavy analysis — if the project has
@@ -33,6 +35,12 @@ For group questions, start with:
 `list_project_history` and `search_project_history` return a slim format intentionally —
 no reviews, no streaming links, no images. Always call `get_album_detail` when you need
 a written review, a Spotify/Apple Music link, or full subgenre breakdown.
+
+`search_project_history` uses OR logic for multi-word queries — all terms are searched
+independently and any match qualifies. Results are ranked by how many terms they match.
+This means you can search for experiential qualities directly: `"raw energy"`,
+`"sparse atmospheric"`, or `"orchestral complex"` will surface albums whose genre or
+style tags contain any of those words, ranked by relevance.
 
 ---
 
@@ -107,14 +115,25 @@ the same format (live/studio), style, or era — call `get_album_detail` to read
 actual review. Do not rely on metadata alone; the review often contains specific language
 about what worked or didn't that metadata cannot capture.
 
-**Step 5 — Use aggregate statistics as context, not foundation**
+**Step 5 — Character search**
+
+Use your understanding of the album's actual character — not just its genre label — to
+run one or two targeted `search_project_history` queries for albums that share the same
+experiential qualities. Think about what makes this album distinctive: its energy, mood,
+instrumentation, cultural origin, format, or the era it actually sounds like rather than
+when it was recorded. The 1001 Albums list specifically includes records that were ahead
+of their time or defined a moment — genre taxonomy often undersells what makes them
+similar to other things in someone's history. Use the results to surface any character-
+specific patterns that `get_album_context`'s genre matching may have missed.
+
+**Step 6 — Use aggregate statistics as context, not foundation**
 
 Call `get_taste_profile`. Use decade and genre averages as secondary, contextualising
 signals only — not as the basis of the prediction. Flag where they may be misleading:
 decade averages conflate musical era with recording date, genre labels are broad, and a
 single outlier album can skew averages significantly.
 
-**Step 6 — Arc check (optional, for long histories)**
+**Step 7 — Arc check (optional, for long histories)**
 
 If the user has a long history and today's album sits outside their apparent comfort zone,
 call `get_listening_arc` to check whether recent taste has drifted toward or away from
@@ -281,6 +300,12 @@ type:
 no reviews, no streaming links, no images. Always call \`get_album_detail\` when you need
 a written review, a Spotify/Apple Music link, or full subgenre breakdown.
 
+\`search_project_history\` uses OR logic for multi-word queries — all terms are searched
+independently and any match qualifies. Results are ranked by how many terms they match.
+This means you can search for experiential qualities directly: \`"raw energy"\`,
+\`"sparse atmospheric"\`, or \`"orchestral complex"\` will surface albums whose genre or
+style tags contain any of those words, ranked by relevance.
+
 ---
 
 ## Understanding an album in context
@@ -354,14 +379,25 @@ the same format (live/studio), style, or era — call `get_album_detail` to read
 actual review. Do not rely on metadata alone; the review often contains specific language
 about what worked or didn't that metadata cannot capture.
 
-**Step 5 — Use aggregate statistics as context, not foundation**
+**Step 5 — Character search**
+
+Use your understanding of the album's actual character — not just its genre label — to
+run one or two targeted \`search_project_history\` queries for albums that share the same
+experiential qualities. Think about what makes this album distinctive: its energy, mood,
+instrumentation, cultural origin, format, or the era it actually sounds like rather than
+when it was recorded. The 1001 Albums list specifically includes records that were ahead
+of their time or defined a moment — genre taxonomy often undersells what makes them
+similar to other things in someone's history. Use the results to surface any character-
+specific patterns that \`get_album_context\`'s genre matching may have missed.
+
+**Step 6 — Use aggregate statistics as context, not foundation**
 
 Call `get_taste_profile`. Use decade and genre averages as secondary, contextualising
 signals only — not as the basis of the prediction. Flag where they may be misleading:
 decade averages conflate musical era with recording date, genre labels are broad, and a
 single outlier album can skew averages significantly.
 
-**Step 6 — Arc check (optional, for long histories)**
+**Step 7 — Arc check (optional, for long histories)**
 
 If the user has a long history and today's album sits outside their apparent comfort zone,
 call `get_listening_arc` to check whether recent taste has drifted toward or away from

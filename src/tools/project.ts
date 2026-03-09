@@ -370,10 +370,10 @@ When closely connected albums are returned — particularly same artist, same st
 
   registerTool(
     "search_project_history",
-    "Searches a project's history by album name, artist, release year, or genre. Returns matching entries in the same slim format as list_project_history (generatedAlbumId, name, artist, year, genres, rating, globalRating, generatedAt — no reviews or streaming links). Use get_album_detail for full information on any result. Requires a projectIdentifier and a query string. Data is cached for 4 hours.",
+    'Searches a project\'s history by album name, artist, release year, genre, or character. Returns matching entries in the same slim format as list_project_history (generatedAlbumId, name, artist, year, genres, rating, globalRating, generatedAt — no reviews or streaming links). Use get_album_detail for full information on any result. Multi-word queries are split and matched using OR logic — any entry matching at least one term is returned, with entries matching more terms ranked first. Use this to search by experiential character: e.g. "raw energetic aggressive" will surface albums tagged with any of those terms. Single-word queries behave as before. Requires a projectIdentifier and a query string. Data is cached for 4 hours.',
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
-      query: z.string().describe("Search query for artist, name, year, or genre"),
+      query: z.string().describe("Search query for artist, name, year, genre, or character"),
     },
     async ({ projectIdentifier, query }) => {
       const pid = requireParam(projectIdentifier, "projectIdentifier");
@@ -381,9 +381,52 @@ When closely connected albums are returned — particularly same artist, same st
       const q = requireParam(query, "query");
       if (typeof q === "object" && "error" in q) return q.response;
       const project = await client.getProject(pid);
-      const lowerQuery = q.toLowerCase();
-      const filtered = project.history.filter((h) => h.album.name.toLowerCase().includes(lowerQuery) || h.album.artist.toLowerCase().includes(lowerQuery) || h.album.releaseDate.includes(lowerQuery) || h.album.genres.some((g: string) => g.toLowerCase().includes(lowerQuery)));
-      const slim = filtered.map(slimHistoryEntry);
+
+      const terms = q
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((t) => t.length > 0);
+
+      const matches = project.history.filter((h) => {
+        const text = [
+          h.album.name,
+          h.album.artist,
+          h.album.releaseDate,
+          ...(h.album.genres ?? []),
+          ...(h.album.styles ?? []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return terms.some((term) => text.includes(term));
+      });
+
+      if (terms.length > 1) {
+        matches.sort((a, b) => {
+          const textA = [
+            a.album.name,
+            a.album.artist,
+            a.album.releaseDate,
+            ...(a.album.genres ?? []),
+            ...(a.album.styles ?? []),
+          ]
+            .join(" ")
+            .toLowerCase();
+          const textB = [
+            b.album.name,
+            b.album.artist,
+            b.album.releaseDate,
+            ...(b.album.genres ?? []),
+            ...(b.album.styles ?? []),
+          ]
+            .join(" ")
+            .toLowerCase();
+          const scoreA = terms.filter((t) => textA.includes(t)).length;
+          const scoreB = terms.filter((t) => textB.includes(t)).length;
+          return scoreB - scoreA;
+        });
+      }
+
+      const slim = matches.map(slimHistoryEntry);
       return { content: [{ type: "text", text: JSON.stringify(slim, null, 2) }] };
     },
     true,

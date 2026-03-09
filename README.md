@@ -145,9 +145,15 @@ Restart Claude Desktop after any config change.
 | `get_album_of_the_day`   | Today's assigned album with full metadata and project notes              |
 | `get_project_stats`      | Progress summary: generated, rated, unrated, current album               |
 | `list_project_history`¹  | Full history with sort and pagination                                    |
-| `search_project_history` | Search history by artist, album, year, or genre                          |
+| `search_project_history` | Search history by artist, album, year, genre, or character — multi-word queries use OR matching |
 | `get_album_detail`²      | Full detail for one album: review, streaming links, subgenres            |
 | `get_album_context`      | Artist arc, musical connections, community divergence, listening journey |
+
+### Meta tools
+
+| Tool             | Description                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------- |
+| `get_tool_guide` | Returns the full workflow guide — recommended tool sequences, signal weighting, common mistakes |
 
 ### Analysis tools
 
@@ -264,7 +270,7 @@ npm run build
 npm test
 ```
 
-When adding tools, register them in `createMcpServer()` in `src/index.ts` and update `README.md`, `AGENTS.md`, and the `info://1001-albums/tool-guide` resource. See [AGENTS.md](./AGENTS.md) for the full contribution guide.
+When adding tools, register them in `createMcpServer()` in `src/index.ts` and update `README.md`, `AGENTS.md`, and `src/content/resources/tool-guide.md`. The updated tool-guide is automatically returned by `get_tool_guide` — no additional step needed. See [AGENTS.md](./AGENTS.md) for the full contribution guide.
 
 ---
 
