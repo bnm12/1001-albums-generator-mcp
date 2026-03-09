@@ -75,6 +75,7 @@ since the album hasn't been rated yet.
 | How has my genre exposure shifted across phases of my history? | `get_listening_arc` (top_genres per arc_segment) |
 | What does this user value/dislike in a specific genre or with a specific artist? | `get_review_insights` (query pattern) |
 | What qualitative context exists for predicting today's album rating? | `get_review_insights` (albumIdentifier pattern) |
+| How has my genre exposure evolved over time? | `list_project_history` sorted by generatedAt, then analyse |
 
 `get_rating_outliers` takes a `direction` parameter: "`underrated`" (user rated lower than
 community), "`overrated`" (user rated higher), or "`both`". Use "`both`" for open-ended
