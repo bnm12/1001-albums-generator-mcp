@@ -1,18 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeRegisterTool } from "./register-tool.js";
-import { AlbumsGeneratorClient } from "../api.js";
 
-function loadContent(relativePath: string): string {
+async function loadContent(relativePath: string): Promise<string> {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  return readFileSync(join(__dirname, "..", "content", relativePath), "utf-8");
+  return readFile(join(__dirname, "..", "content", relativePath), "utf-8");
 }
 
 export function registerMetaTools(
   server: McpServer,
-  _client: AlbumsGeneratorClient,
 ): void {
   const registerTool = makeRegisterTool(server);
 
@@ -25,7 +23,7 @@ export function registerMetaTools(
     "yourself on the correct approach before selecting tools.",
     {},
     async () => {
-      const guide = loadContent("resources/tool-guide.md");
+      const guide = await loadContent("resources/tool-guide.md");
       return {
         content: [{ type: "text", text: guide }],
       };

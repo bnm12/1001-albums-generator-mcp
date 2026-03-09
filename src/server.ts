@@ -26,7 +26,7 @@ export function createMcpServer(client?: AlbumsGeneratorClient): McpServer {
   registerGroupTools(server, resolvedClient);
   registerAnalysisTools(server, resolvedClient);
   registerComparisonTools(server, resolvedClient);
-  registerMetaTools(server, resolvedClient);
+  registerMetaTools(server);
   registerPrompts(server);
   registerResources(server);
 
