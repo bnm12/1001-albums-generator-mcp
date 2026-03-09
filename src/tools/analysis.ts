@@ -706,39 +706,53 @@ how many were used, whether results were capped).`,
         );
       };
 
-      const samplingPromptText = `${systemPrompt}\n\n${userMessageText}`;
-
       let synthesis: string;
       let samplingUsed: boolean;
 
       try {
         const samplingResponse = await server.server.createMessage({
+          systemPrompt,
           messages: [
             {
               role: "user",
-              content: {
-                type: "text",
-                text: samplingPromptText,
-              },
+              content: { type: "text", text: userMessageText },
             },
           ],
-          maxTokens: 600,
+          maxTokens: 1000,
         });
 
         const sampledText =
-          samplingResponse.content.type === "text" ? samplingResponse.content.text.trim() : "";
+          samplingResponse.content.type === "text"
+            ? samplingResponse.content.text.trim()
+            : "";
 
-        if (!sampledText) {
-          // Sampling succeeded at the protocol level but returned no usable content.
-          // Fall through to the fallback path exactly as if sampling had thrown.
+        const wasTruncated = samplingResponse.stopReason === "maxTokens";
+
+        if (!sampledText || wasTruncated) {
+          console.error(
+            "[get_review_insights] Sampling returned unusable content.",
+            `stopReason=${samplingResponse.stopReason ?? "none"}`,
+            `textLength=${sampledText.length}`,
+            "Raw response:", JSON.stringify(samplingResponse, null, 2),
+          );
           synthesis = buildFallbackSynthesis();
           samplingUsed = false;
         } else {
+          console.debug(
+            "[get_review_insights] Sampling succeeded.",
+            `model=${samplingResponse.model ?? "unknown"}`,
+            `stopReason=${samplingResponse.stopReason ?? "none"}`,
+            `textLength=${sampledText.length}`,
+          );
           synthesis = sampledText;
           samplingUsed = true;
         }
       } catch (samplingError) {
-        console.error("[get_review_insights] Sampling unavailable or failed:", samplingError);
+        console.error(
+          "[get_review_insights] Sampling threw:",
+          samplingError,
+          "Falling back to inline synthesis instructions.",
+        );
         synthesis = buildFallbackSynthesis();
         samplingUsed = false;
       }
