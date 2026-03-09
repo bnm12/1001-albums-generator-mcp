@@ -375,7 +375,7 @@ describe("project tools", () => {
     assertToolError(notFound, "not found");
   });
 
-  it("resolves today's current album when not in history", async () => {
+  it("resolves today's current album when not in history and populates globalRating", async () => {
     const currentAlbum = makeAlbum({ uuid: "today-uuid", name: "Today's Album", artist: "Artist A" });
     mockClient.getProject.mockResolvedValue(
       makeProjectInfo({
@@ -387,6 +387,18 @@ describe("project tools", () => {
         ],
       }),
     );
+    mockClient.getGlobalStats.mockResolvedValue({
+      albums: [
+        {
+          name: "Today's Album",
+          artist: "Artist A",
+          averageRating: 4.5,
+          genres: ["Rock"],
+          votes: 1000,
+          controversialScore: 0,
+        },
+      ],
+    });
 
     const result = await testClient.client.callTool({
       name: "get_album_context",
@@ -396,6 +408,7 @@ describe("project tools", () => {
     const data = assertToolSuccess(result) as any;
     expect(data.targetAlbum.name).toBe("Today's Album");
     expect(data.targetAlbum.userRating).toBeNull();
+    expect(data.targetAlbum.globalRating).toBe(4.5);
     expect(data.listeningJourney).toEqual([]);
     expect(data.communityDivergence.interpretation).toContain("today's current album");
     // Artist arc should contain the other album by Artist A
@@ -413,6 +426,7 @@ describe("project tools", () => {
         ],
       }),
     );
+    mockClient.getGlobalStats.mockResolvedValue({ albums: [] });
 
     const result = await testClient.client.callTool({
       name: "get_album_context",

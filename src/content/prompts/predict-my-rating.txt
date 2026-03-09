@@ -8,7 +8,7 @@
   release year label.
 
   To do this well, you MUST follow this sequence:
-  1. **Identify the album**: Fetch today's album using `get_album_of_the_day` to know what it is (name, UUID, genres, styles, release year).
+  1. **Identify the album**: Fetch today's album using `get_album_of_the_day` to know what it is (name, UUID, genres, styles, release year). Note the album's UUID from this response. Use it — not the album name — as the `albumIdentifier` in all subsequent tool calls in this workflow.
   2. **Establish taste character**: Call `get_rating_outliers` BEFORE forming any hypothesis. Read the "overrated by user" list carefully to identify the recurring stylistic patterns (energy, rawness, era, format) that reveal my genuine enthusiasms. This is your most reliable predictor.
   3. **Get qualitative evidence**: Use `get_review_insights` with `albumIdentifier` set to today's album name or UUID. Do NOT use the `query` parameter. This synthesises reasoning from stylistically connected albums in my history.
   4. **Get musical context & follow up**: Use `get_album_context` to see how this album fits musically. For any closely connected album (especially same artist, same style, or same era/format), call `get_album_detail` to read my actual review.

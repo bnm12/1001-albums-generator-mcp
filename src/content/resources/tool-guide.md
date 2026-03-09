@@ -54,7 +54,9 @@ user's history. It returns four dimensions:
    a baseline of the user's typical divergence pattern
 4. Listening journey — the 3 albums before and after in chronological order
 
-Identify the album by name, UUID, or `generatedAlbumId` from `list_project_history`.
+**Always use the most specific identifier available.** When you have a UUID or `generatedAlbumId` from a previous tool call, pass it directly to subsequent tools rather than re-resolving by album name. UUID is the most reliable identifier — it is unaffected by name variations, punctuation, and subtitle differences. `generatedAlbumId` is similarly stable. Album names should only be used as a last resort when no stable identifier is in context.
+
+Identifier preference order: **UUID** > **generatedAlbumId** > **album name**
 
 `get_album_context` also works for today's current album — pass the album name or UUID
 from `get_album_of_the_day` directly. The artist arc and musical connections will still
@@ -318,7 +320,9 @@ user's history. It returns four dimensions:
    a baseline of the user's typical divergence pattern
 4. Listening journey — the 3 albums before and after in chronological order
 
-Identify the album by name, UUID, or \`generatedAlbumId\` from \`list_project_history\`.
+**Always use the most specific identifier available.** When you have a UUID or `generatedAlbumId` from a previous tool call, pass it directly to subsequent tools rather than re-resolving by album name. UUID is the most reliable identifier — it is unaffected by name variations, punctuation, and subtitle differences. `generatedAlbumId` is similarly stable. Album names should only be used as a last resort when no stable identifier is in context.
+
+Identifier preference order: **UUID** > **generatedAlbumId** > **album name**
 
 \`get_album_context\` also works for today's current album — pass the album name or UUID
 from \`get_album_of_the_day\` directly. The artist arc and musical connections will still
