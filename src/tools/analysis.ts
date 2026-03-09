@@ -588,7 +588,7 @@ how many were used, whether results were capped).`,
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
       albumIdentifier: z.string().optional().describe(
-        "Album name, UUID, or generatedAlbumId to anchor the review search by genre/style/artist connections",
+        "Album identifier. Prefer UUID or generatedAlbumId when available — these are unambiguous and not affected by punctuation, casing, or subtitle differences. Fall back to the album name only when no stable identifier is available. UUIDs are returned by get_album_of_the_day, list and search tools, and get_album_context. The generatedAlbumId is available from list_project_history and search_project_history.",
       ),
       query: z.string().optional().describe(
         "Freetext query matched against artist name, album name, genre, or style",
@@ -689,6 +689,23 @@ how many were used, whether results were capped).`,
         "- Exceed 250 words\n\n" +
         "Return only the insight text. No preamble, no headings, no bullet points unless the insight genuinely requires them to be clear.";
 
+      const buildFallbackSynthesis = () => {
+        return (
+          `Here are the ${context.selectedReviews.length} most relevant reviews from this listener's history` +
+          (context.wasCapped ? ` (top ${limit} by community divergence)` : "") +
+          `.\n\n` +
+          `${reviewBlock}\n\n` +
+          `Synthesise these reviews into a concise qualitative insight (max 250 words) about ` +
+          `this listener's taste in the relevant area. Focus on:\n` +
+          `- What qualities, sounds, or characteristics they explicitly value or praise\n` +
+          `- What they dislike or criticise — be specific, not generic\n` +
+          `- Patterns in what makes them rate something higher or lower than the community\n` +
+          `- Contradictions or nuances (e.g. "loves jazz but dislikes free jazz")\n` +
+          `Do NOT summarise each album individually. Do NOT repeat the ratings. ` +
+          `Do NOT make generic statements that carry no signal.`
+        );
+      };
+
       const samplingPromptText = `${systemPrompt}\n\n${userMessageText}`;
 
       let synthesis: string;
@@ -708,27 +725,21 @@ how many were used, whether results were capped).`,
           maxTokens: 600,
         });
 
-        synthesis =
-          samplingResponse.content.type === "text"
-            ? samplingResponse.content.text
-            : "Sampling returned a non-text response.";
-        samplingUsed = true;
+        const sampledText =
+          samplingResponse.content.type === "text" ? samplingResponse.content.text.trim() : "";
+
+        if (!sampledText) {
+          // Sampling succeeded at the protocol level but returned no usable content.
+          // Fall through to the fallback path exactly as if sampling had thrown.
+          synthesis = buildFallbackSynthesis();
+          samplingUsed = false;
+        } else {
+          synthesis = sampledText;
+          samplingUsed = true;
+        }
       } catch (samplingError) {
         console.error("[get_review_insights] Sampling unavailable or failed:", samplingError);
-
-        synthesis =
-          `Here are the ${context.selectedReviews.length} most relevant reviews from this listener's history` +
-          (context.wasCapped ? ` (top ${limit} by community divergence)` : "") +
-          `.\n\n` +
-          `${reviewBlock}\n\n` +
-          `Synthesise these reviews into a concise qualitative insight (max 250 words) about ` +
-          `this listener's taste in the relevant area. Focus on:\n` +
-          `- What qualities, sounds, or characteristics they explicitly value or praise\n` +
-          `- What they dislike or criticise — be specific, not generic\n` +
-          `- Patterns in what makes them rate something higher or lower than the community\n` +
-          `- Contradictions or nuances (e.g. "loves jazz but dislikes free jazz")\n` +
-          `Do NOT summarise each album individually. Do NOT repeat the ratings. ` +
-          `Do NOT make generic statements that carry no signal.`;
+        synthesis = buildFallbackSynthesis();
         samplingUsed = false;
       }
 

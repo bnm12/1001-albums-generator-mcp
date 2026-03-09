@@ -267,9 +267,49 @@ describe("analysis tools", () => {
       });
 
       const data = assertToolSuccess(result) as Record<string, unknown>;
-      expect(String(data.synthesis)).toContain("atmospheric");
+      expect(String(data.synthesis)).toBe("This listener values atmospheric and emotionally resonant music.");
       expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(true);
       expect((data.metadata as { reviewsUsed: number }).reviewsUsed).toBe(1);
+    });
+
+    it("falls through to fallback when sampling returns empty string", async () => {
+      const history = [
+        makeHistoryEntry({ review: "Great album.", rating: 5 }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      await testClient.cleanup();
+      testClient = await createTestClient(mockClient, { sampling: {} });
+      setupSamplingHandler(testClient.client, "");
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(false);
+      expect(String(data.synthesis)).toContain("Synthesise these reviews");
+    });
+
+    it("falls through to fallback when sampling returns whitespace-only text", async () => {
+      const history = [
+        makeHistoryEntry({ review: "Great album.", rating: 5 }),
+      ];
+      mockClient.getProject.mockResolvedValue(makeProjectInfo({ history }));
+
+      await testClient.cleanup();
+      testClient = await createTestClient(mockClient, { sampling: {} });
+      setupSamplingHandler(testClient.client, "   \n  ");
+
+      const result = await testClient.client.callTool({
+        name: "get_review_insights",
+        arguments: { projectIdentifier: "my-project" },
+      });
+
+      const data = assertToolSuccess(result) as Record<string, unknown>;
+      expect((data.metadata as { samplingUsed: boolean }).samplingUsed).toBe(false);
+      expect(String(data.synthesis)).toContain("Synthesise these reviews");
     });
 
     it("falls back with raw reviews when sampling unavailable", async () => {

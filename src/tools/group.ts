@@ -75,7 +75,9 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces (vis
 in the group page URL). Data is cached for 4 hours.`,
     {
       groupSlug: z.string().describe("The group slug (lowercase, hyphenated) from the group page URL"),
-      albumIdentifier: z.string().describe("The album UUID, or album name to resolve against the book list"),
+      albumIdentifier: z.string().describe(
+        "Album identifier. Prefer UUID or generatedAlbumId when available — these are unambiguous and not affected by punctuation, casing, or subtitle differences. Fall back to the album name only when no stable identifier is available. UUIDs are returned by get_album_of_the_day, list and search tools, and get_album_context. The generatedAlbumId is available from list_project_history and search_project_history.",
+      ),
     },
     async ({ groupSlug, albumIdentifier }) => {
       const gs = requireParam(groupSlug, "groupSlug");

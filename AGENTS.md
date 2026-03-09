@@ -144,7 +144,13 @@ When you need any of the following, call `get_album_detail` first:
 - Full genre/style/subgenre breakdown
 - Album artwork image URLs
 
-Use the `generatedAlbumId` from a list tool result to identify the album in `get_album_detail`.
+### Prefer specific identifiers
+
+When an agent has a UUID or `generatedAlbumId` from a previous tool result, it must pass that identifier rather than re-deriving by name. Name-based lookup is a last resort, not the default. Agents should treat UUIDs as primary keys once obtained.
+
+Identifier preference order: **UUID** > **generatedAlbumId** > **album name**
+
+Use the UUID or `generatedAlbumId` from a list tool result to identify the album in `get_album_detail`, `get_album_context`, and other tools that accept an `albumIdentifier`.
 
 ### `refresh_data` cache key mapping
 

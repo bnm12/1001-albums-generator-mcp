@@ -134,10 +134,12 @@ and decide whether to fetch more.`,
 
   registerTool(
     "get_album_detail",
-    "Returns complete information for a single album from a project's history. Includes full album metadata (name, artist, release year, genres, styles, subgenres, Wikipedia URL, all streaming IDs: Spotify, Apple Music, Tidal, Amazon Music, YouTube Music, Qobuz, Deezer), the user's rating and full written review, global community rating, reveal status, and date generated. Use this when you need to read a review, find a streaming link, or prepare a detailed presentation for a specific album. Identify the album using its name, UUID, or generatedAlbumId (available from list_project_history or search_project_history). Requires a projectIdentifier. Data is cached for 4 hours.",
+    "Returns complete information for a single album from a project's history. Includes full album metadata (name, artist, release year, genres, styles, subgenres, Wikipedia URL, all streaming IDs: Spotify, Apple Music, Tidal, Amazon Music, YouTube Music, Qobuz, Deezer), the user's rating and full written review, global community rating, reveal status, and date generated. Use this when you need to read a review, find a streaming link, or prepare a detailed presentation for a specific album. Requires a projectIdentifier. Data is cached for 4 hours.",
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
-      albumIdentifier: z.string().describe("The name, UUID, or generatedAlbumId of the album"),
+      albumIdentifier: z.string().describe(
+        "Album identifier. Prefer UUID or generatedAlbumId when available — these are unambiguous and not affected by punctuation, casing, or subtitle differences. Fall back to the album name only when no stable identifier is available. UUIDs are returned by get_album_of_the_day, list and search tools, and get_album_context. The generatedAlbumId is available from list_project_history and search_project_history.",
+      ),
     },
     async ({ projectIdentifier, albumIdentifier }) => {
       const pid = requireParam(projectIdentifier, "projectIdentifier");
@@ -171,12 +173,14 @@ and decide whether to fetch more.`,
 
   registerTool(
     "get_album_context",
-    `Identify the target album using its name, UUID, or generatedAlbumId. The tool searches in order: project history, today's current album, then the global book stats. This means it works for today's assigned album even before it has been rated — pass the album name or UUID from \`get_album_of_the_day\` directly. Artist arc and musical connections are always computed from history regardless of where the target album was found. Listening journey and community divergence are only available for albums in history.
+    `Provides multi-dimensional context for an album to help predict or explain a listener's response. The tool searches in order: project history, today's current album, then the global book stats. This means it works for today's assigned album even before it has been rated — pass the album name or UUID from \`get_album_of_the_day\` directly. Artist arc and musical connections are always computed from history regardless of where the target album was found. Listening journey and community divergence are only available for albums in history.
 
 When closely connected albums are returned — particularly same artist, same style, or same year — consider calling \`get_album_detail\` on the most relevant ones to read the user's actual review. This is especially valuable when the connection shares a format (e.g. both live albums), era, or style with today's album, as the review may confirm or contradict assumptions about the user's preferences in that area.`,
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
-      albumIdentifier: z.string().describe("The name, UUID, or generatedAlbumId of the album to contextualize"),
+      albumIdentifier: z.string().describe(
+        "Album identifier. Prefer UUID or generatedAlbumId when available — these are unambiguous and not affected by punctuation, casing, or subtitle differences. Fall back to the album name only when no stable identifier is available. UUIDs are returned by get_album_of_the_day, list and search tools, and get_album_context. The generatedAlbumId is available from list_project_history and search_project_history.",
+      ),
     },
     async ({ projectIdentifier, albumIdentifier }) => {
       const pid = requireParam(projectIdentifier, "projectIdentifier");
@@ -237,6 +241,13 @@ When closely connected albums are returned — particularly same artist, same st
         targetAlbum = project.currentAlbum;
         targetUuid = targetAlbum.uuid;
         interpretation = "This is today's current album — it has not been rated yet";
+
+        // Fill globalRating from cached global stats if available
+        const stats = await client.getGlobalStats();
+        const globalStat = stats.albums.find(
+          (a) => a.name.toLowerCase() === targetAlbum.name.toLowerCase(),
+        );
+        globalRating = globalStat?.averageRating ?? null;
       }
       // 3. Global stats fallback
       else {
