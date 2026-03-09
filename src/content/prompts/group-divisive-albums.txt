@@ -1,5 +1,4 @@
-First, read the resource at info://1001-albums/tool-guide — specifically the recommended
-group workflow for "what divided us" — and info://1001-albums/about for context on how
+First, call `get_tool_guide` to read the recommended group workflow for "what divided us" and read info://1001-albums/about for context on how
 group members share album assignments.
 
 Using the 1001 Albums tools, find the albums that have generated the most disagreement and the most consensus in group "${groupSlug}".

@@ -178,24 +178,138 @@ describe("project tools", () => {
     });
   });
 
-  it("search_project_history matches expected fields and validates params", async () => {
-    mockClient.getProject.mockResolvedValue(
-      makeProjectInfo({
-        history: [
-          makeHistoryEntry({ album: makeAlbum({ name: "Blue Train", artist: "John Coltrane", releaseDate: "1957", genres: ["Jazz"] }) }),
-          makeHistoryEntry({ generatedAlbumId: "2", album: makeAlbum({ name: "Nevermind", artist: "Nirvana", releaseDate: "1991", genres: ["Grunge"] }) }),
-        ],
-      }),
-    );
-    for (const query of ["blue", "coltrane", "1991", "jazz"]) {
-      const result = await testClient.client.callTool({ name: "search_project_history", arguments: { projectIdentifier: "p1", query } });
-      expect((assertToolSuccess(result) as unknown[]).length).toBeGreaterThan(0);
-    }
-    const none = await testClient.client.callTool({ name: "search_project_history", arguments: { projectIdentifier: "p1", query: "zzzz" } });
-    expect(assertToolSuccess(none)).toEqual([]);
+  describe("search_project_history multi-term OR search", () => {
+    beforeEach(() => {
+      mockClient.getProject.mockResolvedValue(
+        makeProjectInfo({
+          history: [
+            makeHistoryEntry({
+              album: makeAlbum({
+                name: "Blue Train",
+                artist: "John Coltrane",
+                releaseDate: "1957",
+                genres: ["Jazz"],
+                styles: ["Hard Bop"],
+              }),
+            }),
+            makeHistoryEntry({
+              generatedAlbumId: "2",
+              album: makeAlbum({
+                name: "Nevermind",
+                artist: "Nirvana",
+                releaseDate: "1991",
+                genres: ["Grunge"],
+                styles: ["Alternative Rock"],
+              }),
+            }),
+            makeHistoryEntry({
+              generatedAlbumId: "3",
+              album: makeAlbum({
+                name: "Kind of Blue",
+                artist: "Miles Davis",
+                releaseDate: "1959",
+                genres: ["Jazz"],
+                styles: ["Modal Jazz"],
+              }),
+            }),
+          ],
+        }),
+      );
+    });
 
-    assertToolError(await testClient.client.callTool({ name: "search_project_history", arguments: { projectIdentifier: "", query: "x" } }), "projectIdentifier");
-    assertToolError(await testClient.client.callTool({ name: "search_project_history", arguments: { projectIdentifier: "p1", query: "" } }), "query");
+    it("returns entries matching any term in a multi-word query", async () => {
+      const result = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "jazz grunge" },
+      });
+      const data = assertToolSuccess(result) as any[];
+      expect(data).toHaveLength(3); // All albums match either "jazz" or "grunge"
+    });
+
+    it("ranks entries matching more terms higher", async () => {
+      const result = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "blue jazz" },
+      });
+      const data = assertToolSuccess(result) as any[];
+      // "Blue Train" and "Kind of Blue" match both "blue" and "jazz"
+      // "Miles Davis" (if it were in history) would match just "jazz" (wait, Kind of Blue IS jazz)
+      // Actually:
+      // "Blue Train": matches "blue" (name) and "jazz" (genre) -> 2
+      // "Kind of Blue": matches "blue" (name) and "jazz" (genre) -> 2
+      // "Nevermind": matches none -> filtered out
+      expect(data).toHaveLength(2);
+      expect(data[0].album.name).toMatch(/Blue/);
+      expect(data[1].album.name).toMatch(/Blue/);
+    });
+
+    it("ranks entries correctly with specific overlap", async () => {
+      mockClient.getProject.mockResolvedValue(
+        makeProjectInfo({
+          history: [
+            makeHistoryEntry({
+              album: makeAlbum({ name: "Jazz Funk", genres: ["Jazz", "Funk"] }),
+            }),
+            makeHistoryEntry({
+              album: makeAlbum({ name: "Pure Jazz", genres: ["Jazz"] }),
+            }),
+          ],
+        }),
+      );
+      const result = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "jazz funk" },
+      });
+      const data = assertToolSuccess(result) as any[];
+      expect(data).toHaveLength(2);
+      expect(data[0].album.name).toBe("Jazz Funk");
+      expect(data[1].album.name).toBe("Pure Jazz");
+    });
+
+    it("single-term query behaviour is unchanged", async () => {
+      const result = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "grunge" },
+      });
+      const data = assertToolSuccess(result) as any[];
+      expect(data).toHaveLength(1);
+      expect(data[0].album.name).toBe("Nevermind");
+    });
+
+    it("returns empty when no term matches anything", async () => {
+      const result = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "xyzzy" },
+      });
+      const data = assertToolSuccess(result) as any[];
+      expect(data).toEqual([]);
+    });
+
+    it("handles extra whitespace in query gracefully", async () => {
+      const result = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "  jazz   grunge  " },
+      });
+      const data = assertToolSuccess(result) as any[];
+      expect(data).toHaveLength(3);
+    });
+
+    it("validates parameters", async () => {
+      assertToolError(
+        await testClient.client.callTool({
+          name: "search_project_history",
+          arguments: { projectIdentifier: "", query: "x" },
+        }),
+        "projectIdentifier",
+      );
+      assertToolError(
+        await testClient.client.callTool({
+          name: "search_project_history",
+          arguments: { projectIdentifier: "p1", query: "" },
+        }),
+        "query",
+      );
+    });
   });
 
   it("get_album_detail finds by name/uuid/generatedAlbumId and validates params", async () => {
@@ -208,7 +322,7 @@ describe("project tools", () => {
     }
 
     const missing = await testClient.client.callTool({ name: "get_album_detail", arguments: { projectIdentifier: "p1", albumIdentifier: "missing" } });
-    expect(assertToolSuccess(missing)).toBeNull();
+    expect(getToolResponseText(missing)).toContain("not found");
 
     assertToolError(await testClient.client.callTool({ name: "get_album_detail", arguments: { projectIdentifier: "", albumIdentifier: "x" } }), "projectIdentifier");
     assertToolError(await testClient.client.callTool({ name: "get_album_detail", arguments: { projectIdentifier: "p1", albumIdentifier: "" } }), "albumIdentifier");

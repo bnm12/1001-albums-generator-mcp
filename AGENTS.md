@@ -62,7 +62,7 @@ When adding a new tool, you **must** also update all of the following:
 
 1. **`README.md`** — add the tool to the appropriate table in the MCP Tools Reference section.
 2. **`AGENTS.md`** — add the tool to the tool-to-dataset mapping table below.
-3. **`src/index.ts` resource `info://1001-albums/tool-guide`** — add the tool to the orientation table and, if relevant, to the recommended workflows section. This resource is the canonical guide AI agents use to decide which tool to reach for — keeping it current is as important as updating the README.
+3. **`src/content/resources/tool-guide.md`** — add the tool to the orientation table and, if relevant, to the recommended workflows section. This file is the source for both the `info://1001-albums/tool-guide` resource and the `get_tool_guide` tool. Keeping it current is as important as updating the README. When adding a new tool, update `tool-guide.md` and the content will be automatically available via `get_tool_guide`. There is no need to update the tool list in `get_tool_guide` itself — it reads the file directly.
 
 4. **`src/tools/*.test.ts`** — add a `describe` block for the new tool in the relevant
    test file. Every new tool must have at minimum:
@@ -112,13 +112,14 @@ ratings, no reviews, no history. They are community-wide aggregates only.
 | `list_user_submitted_album_stats` | User-submitted      | Browsing albums added by the community outside the book                        |
 | `get_project_stats`               | Project             | A user's progress: how many rated, current album (slim), group info. Use `get_album_of_the_day` for full current album detail. |
 | `list_project_history`            | Project             | Browsing a user's history with sort and pagination — use analysis tools first; unlimited form is a heavy escape hatch |
-| `search_project_history`          | Project             | Searching a user's history by name, artist, year, or genre                     |
+| `search_project_history`          | Project             | Searching a user's history by name, artist, year, genre, or character. Multi-word queries use OR matching — any entry containing at least one term qualifies, ranked by term count. |
 | `get_album_detail`                | Project             | Full detail for one album: review, streaming links, metadata                   |
 | `get_album_of_the_day`            | Project             | The album currently assigned to a project                                      |
 | `get_album_context`               | Project             | Artist arc, musical connections, community divergence, listening journey       |
 | `get_taste_profile`               | Project             | Overall taste summary: genres, decades, rating tendencies, community alignment |
 | `get_rating_outliers`             | Project             | Albums where the user most diverges from community consensus                   |
 | `get_review_insights`             | Project             | Qualitative synthesis of written reviews — album-anchored or open query. Uses MCP Sampling when available; falls back to raw reviews with synthesis instructions. |
+| `get_tool_guide`                  | Static file (`tool-guide.md`) | Returns full workflow guide as text. No parameters. Prefer this over the MCP resource URI — most clients do not surface resources. |
 | `get_listening_arc`               | Project             | Chronological arc analysis: segments, trends, and milestones for narrative generation |
 | `get_group`                       | Group               | Group summary: members, slim current album, all-time high/low with computed averageRating. Use `get_group_latest_album` for full latest album with votes. |
 | `get_group_latest_album`          | Group               | Latest group album with all member votes attached                              |
