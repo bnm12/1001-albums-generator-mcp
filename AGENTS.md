@@ -112,7 +112,7 @@ ratings, no reviews, no history. They are community-wide aggregates only.
 | `list_user_submitted_album_stats` | User-submitted      | Browsing albums added by the community outside the book                        |
 | `get_project_stats`               | Project             | A user's progress: how many rated, current album (slim), group info. Use `get_album_of_the_day` for full current album detail. |
 | `list_project_history`            | Project             | Browsing a user's history with sort and pagination — use analysis tools first; unlimited form is a heavy escape hatch |
-| `search_project_history`          | Project             | Searching a user's history by name, artist, year, genre, or character. Multi-word queries use OR matching — any entry containing at least one term qualifies, ranked by term count. |
+| `search_project_history`          | Project             | Searching a user's history by name, artist, year, genre, or character. Multi-word queries use OR matching — any entry containing at least one term qualifies, ranked by term count. Results are paginated (default limit 50); check totalCount to determine if more exist. |
 | `get_album_detail`                | Project             | Full detail for one album: review, streaming links, metadata                   |
 | `get_album_of_the_day`            | Project             | The album currently assigned to a project                                      |
 | `get_album_context`               | Project             | Artist arc, musical connections, community divergence, listening journey       |

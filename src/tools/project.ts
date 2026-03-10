@@ -380,12 +380,18 @@ When closely connected albums are returned — particularly same artist, same st
 
   registerTool(
     "search_project_history",
-    'Searches a project\'s history by album name, artist, release year, genre, or character. Returns matching entries in the same slim format as list_project_history (generatedAlbumId, name, artist, year, genres, rating, globalRating, generatedAt — no reviews or streaming links). Use get_album_detail for full information on any result. Multi-word queries are split and matched using OR logic — any entry matching at least one term is returned, with entries matching more terms ranked first. Use this to search by experiential character: e.g. "raw energetic aggressive" will surface albums tagged with any of those terms. Single-word queries behave as before. Requires a projectIdentifier and a query string. Data is cached for 4 hours.',
+    'Searches a project\'s history by album name, artist, release year, genre, or character. Returns matching entries in the same slim format as list_project_history (generatedAlbumId, name, artist, year, genres, rating, globalRating, generatedAt — no reviews or streaming links). Use get_album_detail for full information on any result. Multi-word queries are split and matched using OR logic — any entry matching at least one term is returned, with entries matching more terms ranked first. Use this to search by experiential character: e.g. "raw energetic aggressive" will surface albums tagged with any of those terms. Results are returned in a pagination envelope (totalCount, returnedCount, offset, limit, results) with a default limit of 50. Pass a higher limit or use offset to retrieve further results. Requires a projectIdentifier and a query string. Data is cached for 4 hours.',
     {
       projectIdentifier: z.string().describe("The name of the project or the sharerId"),
       query: z.string().describe("Search query for artist, name, year, genre, or character"),
+      limit: z.number().int().min(1).default(50).describe(
+        "Maximum number of results to return. Defaults to 50. Increase if you need more results — check totalCount in the response to know whether more exist.",
+      ),
+      offset: z.number().int().min(0).default(0).describe(
+        "Number of results to skip before returning. Use with limit for pagination. Default 0.",
+      ),
     },
-    async ({ projectIdentifier, query }) => {
+    async ({ projectIdentifier, query, limit, offset }) => {
       const pid = requireParam(projectIdentifier, "projectIdentifier");
       if (typeof pid === "object" && "error" in pid) return pid.response;
       const q = requireParam(query, "query");
@@ -437,7 +443,8 @@ When closely connected albums are returned — particularly same artist, same st
       }
 
       const slim = matches.map(slimHistoryEntry);
-      return { content: [{ type: "text", text: JSON.stringify(slim, null, 2) }] };
+      const paginated = paginateAndSort(slim, { limit, offset });
+      return { content: [{ type: "text", text: JSON.stringify(paginated, null, 2) }] };
     },
     true,
   );

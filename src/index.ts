@@ -36,7 +36,7 @@ async function main() {
         return res.json({ status: 'ok' });
       }
 
-      const redisOk = await cache.ping?.() ?? false;
+      const redisOk = await cache.ping();
       if (redisOk) {
         return res.json({ status: 'ok', redis: 'ok' });
       } else {
