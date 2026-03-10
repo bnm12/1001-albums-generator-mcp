@@ -353,8 +353,8 @@ describe("project tools", () => {
 
     const ok = await testClient.client.callTool({ name: "get_album_context", arguments: { projectIdentifier: "p1", albumIdentifier: "target" } });
     const data = assertToolSuccess(ok) as Record<string, unknown>;
-    expect((data.artistArc as unknown[]).length).toBeGreaterThan(0);
-    expect((data.artistArc as Array<{ album: { name: string } }>)[0].album.name).not.toBe("Target");
+    expect((data.sameArtist as unknown[]).length).toBeGreaterThan(0);
+    expect((data.sameArtist as Array<{ album: { name: string } }>)[0].album.name).not.toBe("Target");
     expect((data.musicalConnections as unknown[]).length).toBeLessThanOrEqual(20);
     const journey = data.listeningJourney as Array<{ position: string }>;
     expect(journey.length).toBeLessThanOrEqual(6);
@@ -412,8 +412,8 @@ describe("project tools", () => {
     expect(data.listeningJourney).toEqual([]);
     expect(data.communityDivergence.interpretation).toContain("today's current album");
     // Artist arc should contain the other album by Artist A
-    expect(data.artistArc).toHaveLength(1);
-    expect(data.artistArc[0].album.name).toBe("Old Album");
+    expect(data.sameArtist).toHaveLength(1);
+    expect(data.sameArtist[0].album.name).toBe("Old Album");
   });
 
   it("computes artistArc from history even when target is currentAlbum", async () => {
@@ -433,8 +433,8 @@ describe("project tools", () => {
       arguments: { projectIdentifier: "p1", albumIdentifier: "today" },
     });
     const data = assertToolSuccess(result) as any;
-    expect(data.artistArc).toHaveLength(1);
-    expect(data.artistArc[0].album.name).toBe("H1");
+    expect(data.sameArtist).toHaveLength(1);
+    expect(data.sameArtist[0].album.name).toBe("H1");
   });
 
   it("falls back to global stats when album not in history or currentAlbum", async () => {
