@@ -1,4 +1,4 @@
-name: Release DXT Extensions
+name: Release MCPB Extensions
 
 on:
   push:
@@ -26,8 +26,8 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Install DXT CLI
-        run: npm install -g @anthropic-ai/dxt
+      - name: Install MCPB CLI
+        run: npm install -g @anthropic-ai/mcpb
 
       - name: Get version
         id: version
@@ -40,17 +40,17 @@ jobs:
       - name: Pack Local Extension
         run: |
           cp manifest-local.json manifest.json
-          dxt pack . 1001-albums-generator-mcp-local.dxt
+          mcpb pack . 1001-albums-generator-mcp-local.mcpb
           rm manifest.json
 
       - name: Pack Remote Extension
         run: |
-          mkdir -p /tmp/remote-dxt/remote-shim
-          mkdir -p /tmp/remote-dxt/assets
-          cp manifest-remote.json /tmp/remote-dxt/manifest.json
-          cp remote-shim/index.js /tmp/remote-dxt/remote-shim/index.js
-          cp assets/logo.png /tmp/remote-dxt/assets/logo.png
-          dxt pack /tmp/remote-dxt 1001-albums-generator-mcp-remote.dxt
+          mkdir -p /tmp/remote-mcpb/remote-shim
+          mkdir -p /tmp/remote-mcpb/assets
+          cp manifest-remote.json /tmp/remote-mcpb/manifest.json
+          cp remote-shim/index.js /tmp/remote-mcpb/remote-shim/index.js
+          cp assets/logo.png /tmp/remote-mcpb/assets/logo.png
+          mcpb pack /tmp/remote-mcpb 1001-albums-generator-mcp-remote.mcpb
 
       - name: Create Prerelease
         uses: softprops/action-gh-release@v2
@@ -58,8 +58,8 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.name }}
           files: |
-            1001-albums-generator-mcp-local.dxt
-            1001-albums-generator-mcp-remote.dxt
+            1001-albums-generator-mcp-local.mcpb
+            1001-albums-generator-mcp-remote.mcpb
           draft: false
           prerelease: true
           generate_release_notes: true
