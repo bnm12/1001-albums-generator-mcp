@@ -52,7 +52,7 @@ Until then, this server is intentionally read-only with respect to user data.
 - `src/cache.ts`: Contains the `CacheStore` interface and `InMemoryCache`/`RedisCache` implementations.
 - `src/index.ts`: The MCP server entry point. Contains:
   - `createMcpServer()` — factory function that creates a new `McpServer` instance and registers all tools, prompts, and resources on it. Must be called once per session in HTTP mode, and once in stdio mode.
-  - `main()` — starts the server in either `stdio` or `sse` (Streamable HTTP) mode based on the `MCP_MODE` environment variable.
+  - `main()` — starts the server in either stdio or http (Streamable HTTP) mode based on the MCP_MODE environment variable.
 - `src/test-api.ts` & `src/test-cache.ts`: Utility scripts for verifying API connectivity and caching logic.
 - `src/dto.ts`: Defines slim interfaces and transform functions for all API types. Any tool that returns a list or aggregate must use these functions. Summary/orientation tools (`get_project_stats`, `get_group`) slim their nested album fields but otherwise return full responses. Full-response detail tools return raw API types directly. Always include IDs (`uuid`, `slug`, `generatedAlbumId`) on slim objects to enable downstream tool lookups.
 
@@ -300,7 +300,7 @@ cleanup between tests.
 
 - Run `npm run build` to compile the TypeScript code.
 - Run `node dist/index.js` to start the server on stdio.
-- Run `MCP_MODE=sse PORT=3000 node dist/index.js` to start on HTTP at `http://localhost:3000/mcp`.
+- Run `MCP_MODE=http PORT=3000 node dist/index.js` to start on HTTP at `http://localhost:3000/mcp`.
 - When adding new tools, add them inside `createMcpServer()` and ensure they benefit from the caching layer in `api.ts`.
 - When adding new tools, you **must** update `README.md`, `AGENTS.md`, and the `info://1001-albums/tool-guide` resource in `src/index.ts`.
 - When adding new tools, always use slim functions from `src/dto.ts` for list and aggregate responses. Never inline object slimming in tool handlers. If a new raw type needs slimming, add its interface and function to `src/dto.ts` first.
