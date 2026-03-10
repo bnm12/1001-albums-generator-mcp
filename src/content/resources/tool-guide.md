@@ -29,7 +29,7 @@ For group questions, start with:
 | What is today's album? | `get_album_of_the_day` |
 | Browse history with sort and pagination | `list_project_history` (with limit, offset, sortBy) |
 | Get full raw history (heavy — read description first) | `list_project_history` (no limit) |
-| Find albums by artist, genre, or year | `search_project_history` |
+| Find albums by artist, genre, or year | `search_project_history` (returns paginated envelope, default 50 results) |
 | Get full detail, review, and streaming links for one album | `get_album_detail` |
 
 `list_project_history` and `search_project_history` return a slim format intentionally —

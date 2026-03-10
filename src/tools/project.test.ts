@@ -222,8 +222,9 @@ describe("project tools", () => {
         name: "search_project_history",
         arguments: { projectIdentifier: "p1", query: "jazz grunge" },
       });
-      const data = assertToolSuccess(result) as any[];
-      expect(data).toHaveLength(3); // All albums match either "jazz" or "grunge"
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(3); // All albums match either "jazz" or "grunge"
+      expect(data.results).toHaveLength(3);
     });
 
     it("ranks entries matching more terms higher", async () => {
@@ -231,16 +232,16 @@ describe("project tools", () => {
         name: "search_project_history",
         arguments: { projectIdentifier: "p1", query: "blue jazz" },
       });
-      const data = assertToolSuccess(result) as any[];
+      const data = assertToolSuccess(result) as any;
       // "Blue Train" and "Kind of Blue" match both "blue" and "jazz"
       // "Miles Davis" (if it were in history) would match just "jazz" (wait, Kind of Blue IS jazz)
       // Actually:
       // "Blue Train": matches "blue" (name) and "jazz" (genre) -> 2
       // "Kind of Blue": matches "blue" (name) and "jazz" (genre) -> 2
       // "Nevermind": matches none -> filtered out
-      expect(data).toHaveLength(2);
-      expect(data[0].album.name).toMatch(/Blue/);
-      expect(data[1].album.name).toMatch(/Blue/);
+      expect(data.totalCount).toBe(2);
+      expect(data.results[0].album.name).toMatch(/Blue/);
+      expect(data.results[1].album.name).toMatch(/Blue/);
     });
 
     it("ranks entries correctly with specific overlap", async () => {
@@ -260,10 +261,10 @@ describe("project tools", () => {
         name: "search_project_history",
         arguments: { projectIdentifier: "p1", query: "jazz funk" },
       });
-      const data = assertToolSuccess(result) as any[];
-      expect(data).toHaveLength(2);
-      expect(data[0].album.name).toBe("Jazz Funk");
-      expect(data[1].album.name).toBe("Pure Jazz");
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(2);
+      expect(data.results[0].album.name).toBe("Jazz Funk");
+      expect(data.results[1].album.name).toBe("Pure Jazz");
     });
 
     it("single-term query behaviour is unchanged", async () => {
@@ -271,9 +272,9 @@ describe("project tools", () => {
         name: "search_project_history",
         arguments: { projectIdentifier: "p1", query: "grunge" },
       });
-      const data = assertToolSuccess(result) as any[];
-      expect(data).toHaveLength(1);
-      expect(data[0].album.name).toBe("Nevermind");
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(1);
+      expect(data.results[0].album.name).toBe("Nevermind");
     });
 
     it("returns empty when no term matches anything", async () => {
@@ -281,8 +282,9 @@ describe("project tools", () => {
         name: "search_project_history",
         arguments: { projectIdentifier: "p1", query: "xyzzy" },
       });
-      const data = assertToolSuccess(result) as any[];
-      expect(data).toEqual([]);
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(0);
+      expect(data.results).toEqual([]);
     });
 
     it("handles extra whitespace in query gracefully", async () => {
@@ -290,8 +292,32 @@ describe("project tools", () => {
         name: "search_project_history",
         arguments: { projectIdentifier: "p1", query: "  jazz   grunge  " },
       });
-      const data = assertToolSuccess(result) as any[];
-      expect(data).toHaveLength(3);
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(3);
+      expect(data.results).toHaveLength(3);
+    });
+
+    it("paginates results with limit and offset", async () => {
+      // Use the existing 3-album fixture (Blue Train, Nevermind, Kind of Blue)
+      const result = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "jazz grunge", limit: 2, offset: 0 },
+      });
+      const data = assertToolSuccess(result) as any;
+      expect(data.totalCount).toBe(3);
+      expect(data.returnedCount).toBe(2);
+      expect(data.limit).toBe(2);
+      expect(data.offset).toBe(0);
+      expect(data.results).toHaveLength(2);
+
+      const page2 = await testClient.client.callTool({
+        name: "search_project_history",
+        arguments: { projectIdentifier: "p1", query: "jazz grunge", limit: 2, offset: 2 },
+      });
+      const data2 = assertToolSuccess(page2) as any;
+      expect(data2.totalCount).toBe(3);
+      expect(data2.returnedCount).toBe(1);
+      expect(data2.results).toHaveLength(1);
     });
 
     it("validates parameters", async () => {
