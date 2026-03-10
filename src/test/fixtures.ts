@@ -83,7 +83,7 @@ export function makeGroupInfo(overrides: Partial<GroupInfo> = {}): GroupInfo {
     currentAlbum: null,
     allTimeHighscore: null,
     allTimeLowscore: null,
-    latestAlbumWithVotes: null,
+    latestAlbum: null,
     ...overrides,
   };
 }
