@@ -128,7 +128,7 @@ npm install && npm run build
 **As an HTTP server** (for any MCP client over HTTP):
 
 ```bash
-MCP_MODE=sse PORT=3000 node dist/index.js
+MCP_MODE=http PORT=3000 node dist/index.js
 # Endpoint: http://localhost:3000/mcp
 ```
 
