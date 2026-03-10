@@ -62,19 +62,19 @@ Claude: Today's album is Miles Davis — Kind of Blue (1959).
 
 > **Note:** This server enforces a **20-second minimum interval** between upstream API calls and caches responses for **4 hours** to stay within the upstream rate limit of 3 requests/minute. First requests after a cache miss may be slow — this is a constraint of the [1001 Albums Generator API](https://www.reddit.com/r/1001AlbumsGenerator/comments/p6xw6y/json_api/), not the server.
 
-### Option A — Claude Desktop Extension _(recommended)_
+### Option A — Claude MCP Bundle _(recommended)_
 
 No Node.js required for the remote version.
 
-1. Go to the [releases page](https://github.com/bnm12/1001-albums-generator-mcp/releases) and download a `.dxt` file:
+1. Go to the [releases page](https://github.com/bnm12/1001-albums-generator-mcp/releases) and download a `.mcpb` file:
 
    | File           | What it does                                     |
    | -------------- | ------------------------------------------------ |
-   | `*-remote.dxt` | Connects to the hosted server — zero local setup |
-   | `*-local.dxt`  | Runs the MCP server locally on your machine      |
+   | `*-remote.mcpb` | Connects to the hosted server — zero local setup |
+   | `*-local.mcpb`  | Runs the MCP server locally on your machine      |
 
 2. Open **Claude Desktop → Settings → Extensions**
-3. Drag and drop the `.dxt` file into the window
+3. Drag and drop the `.mcpb` file into the window
 
 ---
 
