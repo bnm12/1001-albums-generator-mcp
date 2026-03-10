@@ -16,10 +16,10 @@
 </p>
 
 <p align="center">
-  <a href="#-installation">Install</a> ·
-  <a href="#-mcp-tools-reference">Tools</a> ·
-  <a href="#-example-prompts">Prompts</a> ·
-  <a href="#-contributing">Contributing</a>
+  <a href="#installation">Install</a> ·
+  <a href="#mcp-tools-reference">Tools</a> ·
+  <a href="#example-prompts">Prompts</a> ·
+  <a href="#contributing">Contributing</a>
 </p>
 
 ---
