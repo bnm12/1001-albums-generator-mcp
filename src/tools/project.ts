@@ -346,7 +346,6 @@ When closely connected albums are returned — particularly same artist, same st
           userMeanDivergence: meanDivergence,
           interpretation,
         },
-        artistArc,
         musicalConnections,
         listeningJourney,
         sameArtist: artistArc,
