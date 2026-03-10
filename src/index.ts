@@ -26,7 +26,7 @@ export const defaultClient = new AlbumsGeneratorClient(API_BASE_URL, cache);
 async function main() {
   const mode = process.env.MCP_MODE || "stdio";
 
-  if (mode === "sse") {
+  if (mode === "http") {
     const app = express();
     const port = process.env.PORT || 3000;
     const transports = new Map<string, StreamableHTTPServerTransport>();
