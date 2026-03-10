@@ -26,38 +26,26 @@ describe("group tools", () => {
   it("get_group returns slim info and validates slug", async () => {
     mockClient.getGroup.mockResolvedValue(
       makeGroupInfo({
-        latestAlbumWithVotes: {
-          album: makeAlbum({ uuid: "eeeeeeeeeeeeeeeeeeeeeeee" }),
-          votes: [{ projectIdentifier: "a", rating: 4 }],
-        },
-        allTimeHighscore: {
-          album: makeAlbum({ uuid: "bbbbbbbbbbbbbbbbbbbbbbbb" }),
-          votes: [
-            { projectIdentifier: "a", rating: 5 },
-            { projectIdentifier: "b", rating: 4 },
-          ],
-        },
-        allTimeLowscore: {
-          album: makeAlbum({ uuid: "cccccccccccccccccccccccc" }),
-          votes: [{ projectIdentifier: "a", rating: 1 }],
-        },
+        latestAlbum: makeAlbum({ uuid: "eeeeeeeeeeeeeeeeeeeeeeee" }),
+        allTimeHighscore: makeAlbum({ uuid: "bbbbbbbbbbbbbbbbbbbbbbbb" }),
+        allTimeLowscore: makeAlbum({ uuid: "cccccccccccccccccccccccc" }),
       }),
     );
     const result = await testClient.client.callTool({ name: "get_group", arguments: { groupSlug: "g1" } });
-    const data = assertToolSuccess(result) as Record<string, unknown>;
-    expect((data.allTimeHighscore as { averageRating: number }).averageRating).toBe(4.5);
-    expect((data.allTimeLowscore as { averageRating: number }).averageRating).toBe(1);
+    const data = assertToolSuccess(result) as Record<string, any>;
+    expect(data.allTimeHighscore.uuid).toBe("bbbbbbbbbbbbbbbbbbbbbbbb");
+    expect(data.allTimeLowscore.uuid).toBe("cccccccccccccccccccccccc");
     expect(data).not.toHaveProperty("latestAlbumWithVotes");
 
     assertToolError(await testClient.client.callTool({ name: "get_group", arguments: { groupSlug: "" } }), "groupSlug");
   });
 
   it("get_group_latest_album returns latest or null", async () => {
-    mockClient.getGroup.mockResolvedValue(makeGroupInfo({ latestAlbumWithVotes: { album: makeAlbum(), votes: [{ projectIdentifier: "a", rating: 3 }] } }));
+    mockClient.getGroup.mockResolvedValue(makeGroupInfo({ latestAlbum: makeAlbum({ name: "Latest" }) }));
     const result = await testClient.client.callTool({ name: "get_group_latest_album", arguments: { groupSlug: "g1" } });
-    expect(assertToolSuccess(result)).toMatchObject({ votes: [{ projectIdentifier: "a", rating: 3 }] });
+    expect(assertToolSuccess(result)).toMatchObject({ name: "Latest" });
 
-    mockClient.getGroup.mockResolvedValueOnce(makeGroupInfo({ latestAlbumWithVotes: null }));
+    mockClient.getGroup.mockResolvedValueOnce(makeGroupInfo({ latestAlbum: null }));
     const none = await testClient.client.callTool({ name: "get_group_latest_album", arguments: { groupSlug: "g1" } });
     expect(assertToolSuccess(none)).toBeNull();
 
@@ -139,10 +127,7 @@ describe("group tools", () => {
     it("get_group_album_reviews returns structured error when reviews endpoint fails", async () => {
       mockClient.getGroup.mockResolvedValue(
         makeGroupInfo({
-          latestAlbumWithVotes: {
-            album: makeAlbum({ uuid: "aaaaaaaaaaaaaaaaaaaaaaaa", name: "album" }),
-            votes: [],
-          },
+        latestAlbum: makeAlbum({ uuid: "aaaaaaaaaaaaaaaaaaaaaaaa", name: "album" }),
         }),
       );
       mockClient.getGroupAlbumReviews.mockRejectedValue(makeAxiosError(404));

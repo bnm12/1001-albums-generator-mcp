@@ -420,11 +420,11 @@ describe("concurrent mixed-endpoint load", () => {
 
     await client.getGroup("test-group");
 
-    // 1 group fetch + 3 album review sub-fetches (high, low, latest) = 4 calls.
-    expect(get).toHaveBeenCalledTimes(4);
+    // After refactor, getGroup only makes 1 call (no more parallel vote fetches).
+    expect(get).toHaveBeenCalledTimes(1);
 
-    // All review fetches should have gone through the throttle queue.
+    // No review fetches should have been made.
     const reviewCalls = callLog.filter((u) => u.includes("/albums/"));
-    expect(reviewCalls).toHaveLength(3);
+    expect(reviewCalls).toHaveLength(0);
   });
 });

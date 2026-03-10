@@ -1,7 +1,6 @@
 import type {
   Album,
   AlbumStat,
-  GroupAlbumWithVotes,
   GroupInfo,
   UserAlbumHistoryEntry,
 } from "./api.js";
@@ -74,49 +73,14 @@ export function slimAlbumStat(stat: AlbumStat): SlimAlbumStat {
   };
 }
 
-export interface SlimGroupAlbumWithVotes {
-  album: SlimAlbum;
-  votes: { projectIdentifier: string; rating: number | null }[];
-}
-
-export function slimGroupAlbumWithVotes(
-  entry: GroupAlbumWithVotes,
-): SlimGroupAlbumWithVotes {
-  return {
-    album: slimAlbum(entry.album),
-    votes: entry.votes,
-  };
-}
-
-export interface SlimGroupScoreAlbum {
-  album: SlimAlbum;
-  averageRating: number;
-}
-
-export function slimGroupScoreAlbum(entry: GroupAlbumWithVotes): SlimGroupScoreAlbum {
-  const ratedVotes = entry.votes.filter((v) => v.rating !== null);
-  const averageRating =
-    ratedVotes.length > 0
-      ? Math.round(
-          (ratedVotes.reduce((sum, v) => sum + (v.rating as number), 0) /
-            ratedVotes.length) *
-            100,
-        ) / 100
-      : 0;
-
-  return {
-    album: slimAlbum(entry.album),
-    averageRating,
-  };
-}
-
 export interface SlimGroupInfo {
   name: string;
   slug: string;
   members: { name: string; projectIdentifier: string }[];
   currentAlbum: SlimAlbum | null;
-  allTimeHighscore: SlimGroupScoreAlbum | null;
-  allTimeLowscore: SlimGroupScoreAlbum | null;
+  allTimeHighscore: SlimAlbum | null;
+  allTimeLowscore: SlimAlbum | null;
+  latestAlbum: SlimAlbum | null;
 }
 
 export function slimGroupInfo(group: GroupInfo): SlimGroupInfo {
@@ -125,12 +89,9 @@ export function slimGroupInfo(group: GroupInfo): SlimGroupInfo {
     slug: group.slug,
     members: group.members,
     currentAlbum: group.currentAlbum ? slimAlbum(group.currentAlbum) : null,
-    allTimeHighscore: group.allTimeHighscore
-      ? slimGroupScoreAlbum(group.allTimeHighscore)
-      : null,
-    allTimeLowscore: group.allTimeLowscore
-      ? slimGroupScoreAlbum(group.allTimeLowscore)
-      : null,
+    allTimeHighscore: group.allTimeHighscore ? slimAlbum(group.allTimeHighscore) : null,
+    allTimeLowscore: group.allTimeLowscore ? slimAlbum(group.allTimeLowscore) : null,
+    latestAlbum: group.latestAlbum ? slimAlbum(group.latestAlbum) : null,
   };
 }
 

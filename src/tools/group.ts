@@ -17,10 +17,10 @@ export function registerGroupTools(
 
 The member list is particularly important: the projectIdentifier for each member is what you pass to get_project_stats, list_project_history, get_taste_profile, get_rating_outliers, and get_group_member_comparison to analyse individual members.
 
-Album fields (currentAlbum, allTimeHighscore, allTimeLowscore) are returned in slim format. allTimeHighscore and allTimeLowscore include a computed averageRating but not individual member votes — use get_group_album_reviews for per-member vote detail.
+Album fields (currentAlbum, allTimeHighscore, allTimeLowscore) are returned in slim format.
 Use get_album_of_the_day or get_group_latest_album for full album detail.
 
-Does not include the latest album with votes — use get_group_latest_album for that. The groupSlug is the group name in lowercase with hyphens instead of spaces (find it in the group page URL). Data is cached for 4 hours.`,
+Does not include the latest album — use get_group_latest_album for that. The groupSlug is the group name in lowercase with hyphens instead of spaces (find it in the group page URL). Data is cached for 4 hours.`,
     {
       groupSlug: z.string().describe("The group slug (lowercase, hyphenated) from the group page URL"),
     },
@@ -36,7 +36,7 @@ Does not include the latest album with votes — use get_group_latest_album for 
 
   registerTool(
     "get_group_latest_album",
-    `Returns the most recently assigned group album along with every member's rating for it. Use this to discuss how the group responded to their latest shared listening experience — who rated it highest, who was coldest on it, and how the group average compares to the community rating.
+    `Returns the most recently assigned group album. If you need to see every member's rating for it, you should follow this up with a call to get_group_album_reviews using the album's UUID.
 
 This is the right starting point for "what did everyone think of the last album?" conversations. For the all-time most divisive albums across the group's full history, use get_group_album_insights instead.
 
@@ -48,7 +48,7 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
       const gs = requireParam(groupSlug, "groupSlug");
       if (typeof gs === "object" && "error" in gs) return gs.response;
       const group = await client.getGroup(gs);
-      return { content: [{ type: "text", text: JSON.stringify(group.latestAlbumWithVotes ?? null, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify(group.latestAlbum ?? null, null, 2) }] };
     },
     true,
   );
@@ -59,15 +59,15 @@ The groupSlug is the group name in lowercase with hyphens instead of spaces. Dat
 
 The albumIdentifier should be the album's UUID — this is the reliable, always-correct
 way to identify an album. UUIDs are available from:
-  - get_group → allTimeHighscore.album.uuid, allTimeLowscore.album.uuid,
+  - get_group → allTimeHighscore.uuid, allTimeLowscore.uuid,
                 currentAlbum.uuid
-  - get_group_latest_album → album.uuid
+  - get_group_latest_album → uuid
   - list_project_history or search_project_history → album.uuid on any history entry
-  - get_album_detail → album.uuid
+  - get_album_detail → uuid
 
 ⚠ NAME RESOLUTION IS LIMITED: If you pass an album name instead of a UUID, the tool
 will attempt to resolve it by searching only the group's currentAlbum, allTimeHighscore,
-allTimeLowscore, and latestAlbumWithVotes. Names from project history or any other
+allTimeLowscore, and latestAlbum. Names from project history or any other
 source will fail to resolve with a "Could not resolve" error. Always prefer passing
 the UUID directly.
 
@@ -89,7 +89,12 @@ in the group page URL). Data is cached for 4 hours.`,
 
       if (!uuidRegex.test(aid)) {
         const group = await client.getGroup(gs);
-        const candidates = [group.currentAlbum, group.allTimeHighscore?.album, group.allTimeLowscore?.album, group.latestAlbumWithVotes?.album].filter((a): a is NonNullable<typeof a> => a != null);
+        const candidates = [
+          group.currentAlbum,
+          group.allTimeHighscore,
+          group.allTimeLowscore,
+          group.latestAlbum,
+        ].filter((a): a is NonNullable<typeof a> => a != null);
         const lowerIdentifier = aid.toLowerCase();
         const match = candidates.find((a) => a.name.toLowerCase() === lowerIdentifier);
 

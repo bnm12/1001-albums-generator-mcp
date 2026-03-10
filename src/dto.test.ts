@@ -3,7 +3,6 @@ import {
   slimAlbum,
   slimAlbumStat,
   slimGroupInfo,
-  slimGroupScoreAlbum,
   slimHistoryEntry,
 } from "./dto.js";
 import { makeAlbum, makeAlbumStat, makeGroupInfo, makeHistoryEntry } from "./test/fixtures.js";
@@ -57,49 +56,20 @@ describe("dto", () => {
     expect(noDate).not.toHaveProperty("releaseDate");
   });
 
-  it("slimGroupScoreAlbum computes rounded average from non-null votes", () => {
-    const result = slimGroupScoreAlbum({
-      album: makeAlbum(),
-      votes: [
-        { projectIdentifier: "a", rating: 4 },
-        { projectIdentifier: "b", rating: null },
-        { projectIdentifier: "c", rating: 5 },
-      ],
-    });
-    expect(result.averageRating).toBe(4.5);
-
-    const empty = slimGroupScoreAlbum({
-      album: makeAlbum(),
-      votes: [{ projectIdentifier: "a", rating: null }],
-    });
-    expect(empty.averageRating).toBe(0);
-  });
-
   it("slimGroupInfo shape", () => {
     const group = makeGroupInfo({
       currentAlbum: makeAlbum(),
-      allTimeHighscore: {
-        album: makeAlbum({ uuid: "bbbbbbbbbbbbbbbbbbbbbbbb" }),
-        votes: [
-          { projectIdentifier: "alice", rating: 5 },
-          { projectIdentifier: "bob", rating: 4 },
-        ],
-      },
-      allTimeLowscore: {
-        album: makeAlbum({ uuid: "cccccccccccccccccccccccc" }),
-        votes: [{ projectIdentifier: "alice", rating: 1 }],
-      },
-      latestAlbumWithVotes: {
-        album: makeAlbum({ uuid: "dddddddddddddddddddddddd" }),
-        votes: [{ projectIdentifier: "alice", rating: 3 }],
-      },
+      allTimeHighscore: makeAlbum({ uuid: "bbbbbbbbbbbbbbbbbbbbbbbb" }),
+      allTimeLowscore: makeAlbum({ uuid: "cccccccccccccccccccccccc" }),
+      latestAlbum: makeAlbum({ uuid: "dddddddddddddddddddddddd" }),
     });
 
     const slim = slimGroupInfo(group);
     expect(slim.members).toEqual(group.members);
     expect(slim.currentAlbum).not.toBeNull();
-    expect((slim.allTimeHighscore as { averageRating: number }).averageRating).toBe(4.5);
-    expect((slim.allTimeLowscore as { averageRating: number }).averageRating).toBe(1);
+    expect(slim.allTimeHighscore?.uuid).toBe("bbbbbbbbbbbbbbbbbbbbbbbb");
+    expect(slim.allTimeLowscore?.uuid).toBe("cccccccccccccccccccccccc");
+    expect(slim.latestAlbum?.uuid).toBe("dddddddddddddddddddddddd");
     expect(slim).not.toHaveProperty("latestAlbumWithVotes");
   });
 });
