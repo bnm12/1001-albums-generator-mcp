@@ -65,19 +65,14 @@ export interface GroupMember {
   projectIdentifier: string;
 }
 
-export interface GroupAlbumWithVotes {
-  album: Album;
-  votes: { projectIdentifier: string; rating: number | null }[];
-}
-
 export interface GroupInfo {
   name: string;
   slug: string;
   members: GroupMember[];
   currentAlbum: Album | null;
-  allTimeHighscore: GroupAlbumWithVotes | null;
-  allTimeLowscore: GroupAlbumWithVotes | null;
-  latestAlbumWithVotes: GroupAlbumWithVotes | null;
+  allTimeHighscore: Album | null;
+  allTimeLowscore: Album | null;
+  latestAlbum: Album | null;
 }
 
 export interface GroupAlbumReview {
@@ -201,88 +196,21 @@ export class AlbumsGeneratorClient {
     const response = await this.axiosInstance.get(`/groups/${groupSlug}`);
     const data = response.data;
 
-    // Map API fields to GroupInfo
     const groupInfo: GroupInfo = {
       name: data.name,
       slug: data.slug,
       members: (data.members || []).map((m: any) => {
         const name = typeof m === 'string' ? m : m.name;
         return {
-          name: name,
+          name,
           projectIdentifier: name,
         };
       }),
       currentAlbum: data.currentAlbum || null,
-      allTimeHighscore: data.highestRatedAlbums?.[0]
-        ? {
-            album: data.highestRatedAlbums[0],
-            votes: [],
-          }
-        : null,
-      allTimeLowscore: data.lowestRatedAlbums?.[0]
-        ? {
-            album: data.lowestRatedAlbums[0],
-            votes: [],
-          }
-        : null,
-      latestAlbumWithVotes: data.latestAlbum
-        ? {
-            album: data.latestAlbum,
-            votes: [],
-          }
-        : null,
+      allTimeHighscore: data.highestRatedAlbums?.[0] ?? null,
+      allTimeLowscore: data.lowestRatedAlbums?.[0] ?? null,
+      latestAlbum: data.latestAlbum ?? null,
     };
-
-    // Populate votes for highscore, lowscore, and latest album in parallel.
-    // Note: client.throttle() will still serialize these to respect rate limits.
-    const voteFetchers: Promise<void>[] = [];
-
-    if (groupInfo.allTimeHighscore) {
-      voteFetchers.push(
-        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeHighscore.album.uuid, forceRefresh).then(
-          (reviews) => {
-            if (groupInfo.allTimeHighscore) {
-              groupInfo.allTimeHighscore.votes = reviews.reviews.map((r) => ({
-                projectIdentifier: r.projectIdentifier,
-                rating: r.rating,
-              }));
-            }
-          }
-        )
-      );
-    }
-
-    if (groupInfo.allTimeLowscore) {
-      voteFetchers.push(
-        this.getGroupAlbumReviews(groupSlug, groupInfo.allTimeLowscore.album.uuid, forceRefresh).then(
-          (reviews) => {
-            if (groupInfo.allTimeLowscore) {
-              groupInfo.allTimeLowscore.votes = reviews.reviews.map((r) => ({
-                projectIdentifier: r.projectIdentifier,
-                rating: r.rating,
-              }));
-            }
-          }
-        )
-      );
-    }
-
-    if (groupInfo.latestAlbumWithVotes) {
-      voteFetchers.push(
-        this.getGroupAlbumReviews(groupSlug, groupInfo.latestAlbumWithVotes.album.uuid, forceRefresh).then(
-          (reviews) => {
-            if (groupInfo.latestAlbumWithVotes) {
-              groupInfo.latestAlbumWithVotes.votes = reviews.reviews.map((r) => ({
-                projectIdentifier: r.projectIdentifier,
-                rating: r.rating,
-              }));
-            }
-          }
-        )
-      );
-    }
-
-    await Promise.all(voteFetchers);
 
     try {
       await this.cache.set(CacheKeys.group(groupSlug), groupInfo, this.CACHE_TTL);
