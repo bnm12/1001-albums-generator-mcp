@@ -29,7 +29,7 @@ For group questions, start with:
 | What is today's album? | `get_album_of_the_day` |
 | Browse history with sort and pagination | `list_project_history` (with limit, offset, sortBy) |
 | Get full raw history (heavy — read description first) | `list_project_history` (no limit) |
-| Find albums by artist, genre, or year | `search_project_history` (returns paginated envelope, default 50 results) |
+| Find albums by artist, genre, or year | `search_project_history` |
 | Get full detail, review, and streaming links for one album | `get_album_detail` |
 
 `list_project_history` and `search_project_history` return a slim format intentionally —
@@ -84,6 +84,12 @@ community), "`overrated`" (user rated higher), or "`both`". Use "`both`" for ope
 taste questions, and a specific direction when the user asks about hidden gems or
 controversial takes.
 
+`get_review_insights` with the `query` parameter uses multi-word OR matching — terms are
+split on whitespace and any entry matching at least one term is returned. Use a single
+precise term for focused results (`"post-hardcore"`) or multiple terms to cast a wider
+net (`"punk post-hardcore"`). Matching is against artist name, album name, genre, and
+style fields.
+
 ---
 
 ### Predicting a rating for today's album
@@ -109,6 +115,12 @@ step 1). Do NOT use the `query` parameter for prediction tasks — the album-anc
 pattern automatically finds reviews of related albums by genre, style, and artist. Treat
 the synthesised output as the primary qualitative signal.
 
+If `samplingUsed: false` in the response, the raw reviews were returned with synthesis
+instructions rather than a pre-built synthesis. In this case, perform the synthesis
+explicitly before moving on: summarise the pattern across the reviews in 2–3 sentences
+(recurring reactions, language, complaints). Label this step visibly in your reasoning.
+Do not silently fold it into the prediction — the synthesis must be auditable.
+
 **Step 4 — Get musical context and follow up on connections**
 
 Call `get_album_context` with today's album name or UUID. This works even for unrated
@@ -117,6 +129,13 @@ companions, shared-genre albums. For any closely connected album — especially 
 the same format (live/studio), style, or era — call `get_album_detail` to read the user's
 actual review. Do not rely on metadata alone; the review often contains specific language
 about what worked or didn't that metadata cannot capture.
+
+When citing a closely connected album's review, explicitly check whether the user's
+specific complaint transfers to today's album. A complaint about format (too long, too
+fragmented, too many tracks, live vs studio) may not apply if today's album has a
+different structure. If the complaint is format-specific and doesn't transfer, reduce the
+predictive weight of that review and note this explicitly rather than treating it as
+near-deterministic evidence.
 
 **Step 5 — Character search**
 
@@ -128,6 +147,12 @@ when it was recorded. The 1001 Albums list specifically includes records that we
 of their time or defined a moment — genre taxonomy often undersells what makes them
 similar to other things in someone's history. Use the results to surface any character-
 specific patterns that `get_album_context`'s genre matching may have missed.
+
+Both `search_project_history` and `get_review_insights` (query pattern) support multi-word
+OR queries — terms are split on whitespace and any entry matching at least one term is
+returned. A query like `"raw energetic punk"` will surface entries matching any of those
+terms, ranked by how many they match. Use this to search by experiential character rather
+than precise genre taxonomy.
 
 **Step 6 — Use aggregate statistics as context, not foundation**
 
